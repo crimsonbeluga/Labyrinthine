@@ -19,3 +19,6 @@ Saved/
 *.idb
 *.ipdb
 *.iobj
+
+# StarterContent folder
+Content/StarterContent/*
