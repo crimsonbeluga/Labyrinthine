@@ -1,5 +1,8 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
-
+// AMazePlayerController.cpp
 #include "AMazePlayerController.h"
+#include "AMazeCameraManager.h"
 
+AAMazePlayerController::AAMazePlayerController()
+{
+    PlayerCameraManagerClass = AAMazeCameraManager::StaticClass();
+}

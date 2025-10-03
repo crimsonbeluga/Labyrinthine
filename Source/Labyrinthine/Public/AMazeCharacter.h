@@ -19,10 +19,20 @@ class LABYRINTHINE_API AAMazeCharacter : public ACharacter
 public:
 	AAMazeCharacter();
 
+	void DealDamage(float DamageAmount);
+	void HandleDeath();
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaTime) override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Health")
+	float currentHealth;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Health")
+	float startingHealth = 100; 
+
 
 	UPROPERTY(VisibleAnywhere, Category = "Components")
 	USpringArmComponent* SpringArm;
@@ -44,6 +54,7 @@ protected:
 	UInputAction* IA_Jump;
 
 
+	
 	void HandleMove(const FInputActionValue& Value);
 	void HandleLook(const FInputActionValue& Value);
 	void OnJumpPressed(const FInputActionValue& Value);

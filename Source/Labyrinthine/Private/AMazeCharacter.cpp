@@ -23,7 +23,7 @@ AAMazeCharacter::AAMazeCharacter()
 
 	Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
 	Camera->SetupAttachment(SpringArm);
-	Camera->bUsePawnControlRotation = false;\
+	Camera->bUsePawnControlRotation = false;
 
 	bUseControllerRotationYaw = false;
 	GetCharacterMovement()->bOrientRotationToMovement = true;
@@ -35,7 +35,9 @@ void AAMazeCharacter::BeginPlay()
 {
     Super::BeginPlay();
 
-    SetupDefaultInputMapping(); // grabbing the input map and setting it as the one we will be using 
+    SetupDefaultInputMapping(); // grabbing the input map and setting it as the one we will be using
+
+    currentHealth = startingHealth;
 }
 
 void AAMazeCharacter::Tick(float DeltaTime)
@@ -100,7 +102,7 @@ void AAMazeCharacter::HandleMove(const FInputActionValue& Value)
 // the matrix can deduce all basis directions: forward/back, left/right, up/down from only knowing what left and right is. think aboout this in real life.
 //     if we know which way left and right is so look to your left and look to your right. then we also know which way forward,backward,up and down is.
 // Once the rotation matrix is created, we call .GetUnitAxis() to retrieve one of those unit vectors so forward backward, left riight or   up down
-// Because in Unreal the Y axis represents Left and Right, we request EAxis::X to get the Right vector.
+// Because in Unreal the Y axis represents Left and Right, we request EAxis::to get the Right vector.
 
     AddMovementInput(Forward, Input.X);
     AddMovementInput(Right, Input.Y);
@@ -153,4 +155,25 @@ void AAMazeCharacter::SetupDefaultInputMapping()
             }
         }
     }
+}
+
+
+void AAMazeCharacter::DealDamage(float DamageAmount)
+{
+    if (currentHealth <= 0) // making sure we dont apply more damage if are players health is already zero so there dead 
+    {
+        return;
+    }
+    
+    currentHealth -= DamageAmount; // subtracting the damage amount from health.
+
+    if (currentHealth <= 0)
+    {
+        HandleDeath();
+    }
+}
+
+void AAMazeCharacter::HandleDeath()
+{
+
 }
