@@ -66,6 +66,33 @@ void AAMazeCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComp
 
             EIC->BindAction(IA_Jump, ETriggerEvent::Completed, this, &AAMazeCharacter::OnJumpReleased);
         }
+
+        if (IA_Interact)//if its assigned in the AMazeCharacter blue print
+        {
+            EIC->BindAction(IA_Interact, ETriggerEvent::Triggered, this, &AAMazeCharacter::OnInteractPressed);
+        }
+
+        if (IA_Use)//if its assigned in the AMazeCharacter blue print
+        {
+            EIC->BindAction(IA_Use, ETriggerEvent::Triggered, this, &AAMazeCharacter::OnUsePressed);
+        }
+
+        if (IA_ItemSlot_1)//if its assigned in the AMazeCharacter blue print
+        {
+            EIC->BindAction(IA_ItemSlot_1, ETriggerEvent::Triggered, this, &AAMazeCharacter::OnItemSlotOnePressed);
+        }
+
+        if (IA_ItemSlot_2)//if its assigned in the AMazeCharacter blue print
+        {
+            EIC->BindAction(IA_ItemSlot_2, ETriggerEvent::Triggered, this, &AAMazeCharacter::OnItemSlotTwoPressed);
+        }
+
+        if (IA_ItemSlot_3)//if its assigned in the AMazeCharacter blue print
+        {
+            EIC->BindAction(IA_ItemSlot_3, ETriggerEvent::Triggered, this, &AAMazeCharacter::OnItemSlotThreePressed);
+        }
+
+      
     }
 }
 
@@ -140,6 +167,37 @@ void AAMazeCharacter::OnJumpReleased(const FInputActionValue& /*Value*/)
 }
 
 
+void AAMazeCharacter::OnInteractPressed(const FInputActionValue& Value)
+{
+
+}
+
+
+void AAMazeCharacter::OnUsePressed(const FInputActionValue& Value)
+{
+
+}
+ 
+
+
+
+void AAMazeCharacter::OnItemSlotOnePressed(const FInputActionValue& Value)
+{
+
+}
+
+
+void AAMazeCharacter::OnItemSlotTwoPressed(const FInputActionValue& Value)
+{
+
+}
+
+
+void AAMazeCharacter::OnItemSlotThreePressed(const FInputActionValue& Value)
+{
+
+}
+
 void AAMazeCharacter::SetupDefaultInputMapping()
 {
     if (APlayerController* PC = Cast<APlayerController>(GetController()))
@@ -167,6 +225,7 @@ void AAMazeCharacter::DealDamage(float DamageAmount)
     
     currentHealth -= DamageAmount; // subtracting the damage amount from health.
 
+    UE_LOG(LogTemp, Warning, TEXT("Damage has been done"));
     if (currentHealth <= 0)
     {
         HandleDeath();
@@ -175,5 +234,5 @@ void AAMazeCharacter::DealDamage(float DamageAmount)
 
 void AAMazeCharacter::HandleDeath()
 {
-
+    UE_LOG(LogTemp, Warning, TEXT("Death has been called"));
 }

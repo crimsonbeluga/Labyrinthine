@@ -22,16 +22,16 @@ public:
 	void DealDamage(float DamageAmount);
 	void HandleDeath();
 
-protected:
-	virtual void BeginPlay() override;
-	virtual void Tick(float DeltaTime) override;
-	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
-
 	UPROPERTY(BlueprintReadOnly, Category = "Health")
 	float currentHealth;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Health")
-	float startingHealth = 100; 
+	float startingHealth = 100;
+
+protected:
+	virtual void BeginPlay() override;
+	virtual void Tick(float DeltaTime) override;
+	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
 
 	UPROPERTY(VisibleAnywhere, Category = "Components")
@@ -53,13 +53,31 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	UInputAction* IA_Jump;
 
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	UInputAction* IA_Interact;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	UInputAction* IA_ItemSlot_1;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	UInputAction* IA_ItemSlot_2;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	UInputAction* IA_ItemSlot_3;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	UInputAction* IA_Use;
 
 	
 	void HandleMove(const FInputActionValue& Value);
 	void HandleLook(const FInputActionValue& Value);
 	void OnJumpPressed(const FInputActionValue& Value);
 	void OnJumpReleased(const FInputActionValue& Value);
-
+	void OnInteractPressed(const FInputActionValue& Value);
+	void OnUsePressed(const FInputActionValue& Value);
+	void OnItemSlotOnePressed(const FInputActionValue& Value);
+	void OnItemSlotTwoPressed(const FInputActionValue& Value);
+	void OnItemSlotThreePressed(const FInputActionValue& Value);
 private:
 	void SetupDefaultInputMapping();
 
