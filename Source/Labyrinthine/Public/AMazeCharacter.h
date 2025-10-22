@@ -11,6 +11,7 @@ class USpringArmComponent;
 class UInputMappingContext;
 class UInputAction;
 class USphereComponent;
+class UInventoryComponent;
 
 UCLASS()
 class LABYRINTHINE_API AAMazeCharacter : public ACharacter
@@ -86,6 +87,9 @@ protected:
 // Commonly used for transient references like "currently focused" or "target" objects.
 // "<AActor> is simply defining the type of object the pointer is allowed to store
 	// and focused actor is just the name
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
+	UInventoryComponent* Inventory = nullptr;
 
 
 	void UpdateInteractionFocus();      // called from Tick

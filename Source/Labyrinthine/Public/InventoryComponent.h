@@ -1,101 +1,104 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+// InventoryComponent.h
+// This header declares the inventory component class and the FItemStack struct used to store items.
+// The component exposes a simple 3-slot hotbar with basic operations: add items, find slots, select active slot, and use the active item.
 
 #pragma once
 
-#include "CoreMinimal.h"
-#include "Components/ActorComponent.h"
-#include "ItemDef.h"
-#include "InventoryComponent.generated.h"
+#include "CoreMinimal.h"                 // Core Unreal types and utilities (FString, TArray, INDEX_NONE, etc.)
+#include "Components/ActorComponent.h"   // Base class for UActorComponent
+#include "InventoryComponent.generated.h"// Required for UHT (Unreal Header Tool) to generate reflection code
 
+class UItemDef; // Forward declaration: UItemDef is a data asset describing an item type (name, icon, MaxStack, etc.)
 
-
+// ============================
+// FItemStack: a single hotbar slot
+// ============================
+// Represents one stack of items in the hotbar.
+// Holds a pointer to the item definition (type) and a count (quantity).
 USTRUCT(BlueprintType)
 struct FItemStack
-	// Represents a single inventory slot containing an item type and its quantity.
-// Used so the inventory can store multiple item stacks (e.g., 3 Health Packs, 2 Flashbangs, etc.).
-// so we can make an instance of the struct and use it for each item 
-
 {
-	GENERATED_BODY()
-	// Required Unreal macro that generates boilerplate code for reflection,
-// serialization, and Blueprint integration. It lets the engine recognize
-// this struct/class and expose its properties/functions to the editor.
+	GENERATED_BODY() // Expands to boilerplate needed by Unreal's reflection system for USTRUCTs
 
+		// The type of item stored in this stack (nullptr means the slot is empty or invalid).
+		// Marked EditAnywhere/BlueprintReadWrite so designers can view/edit in editor and Blueprints can read/write it.
+		UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	UItemDef* Item = nullptr;
 
+	// How many copies of this item are in the stack. 0 means empty.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	TObjectPtr<UItemDef> Item = nullptr;
-	// "TObjectPtr" is a type of point to a UObject thats meant to be a drop in replacement for a raw pointer
-	//"Item"  is a Reference to the Data Asset defining the health pack
+	int32 Count = 0;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 Count = 0; 
-	//How many of this item  you own in your inventory right now.
-
-
-	bool isValid() const { return Item && Count > 0; }
-	//just a quick way to check whether this inventory slot (or “stack”) actually contains something useful.
-	//evaluates to true only if both of these are true:
-	//Item is not nullptr (so there’s actually an item assigned)
-	//Count is greater than zero(so you actually have some of it)
+	// Convenience helper: a stack is "valid" only if it has a real item AND a positive count.
+	// (Used in logic to check quickly whether a slot is occupied.)
+	bool isValid() const { return Item != nullptr && Count > 0; }
 };
 
+// ==================================
+// UInventoryComponent: the hotbar API
+// ==================================
+// Actor component that manages a fixed-size hotbar (3 slots).
+// It provides functions to add items (with stacking), find existing stacks, select which slot is active,
+// and consume/use the active slot. It’s designed to be simple and easily expanded later.
 UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
-// "ClassGroup simply controls where the component appears in the add Component drop down  in unreal 
-// By default, custom C++ components are not automatically visible in the Blueprint
-// "Add Component" list. They can only be attached through C++ code.
-//
-// Adding the meta tag "BlueprintSpawnableComponent" makes this component appear
-// in the Blueprint Editor's Add Component menu, allowing designers to:
-//
-//   • Add this component to any Actor or Pawn directly in the Blueprint Editor.
-//   • View and edit its properties in the Details panel.
-//   • Have it automatically created and initialized when the Blueprint spawns.
-//
-// This is what lets UInventoryComponent be reusabl
-
-class UInventoryComponent : public UActorComponent
+class LABYRINTHINE_API UInventoryComponent : public UActorComponent
 {
+	GENERATED_BODY() // Required by Unreal for reflection and component lifecycle
 
-	GENERATED_BODY()
+public:
+	// Constructor: sets defaults (e.g., disables ticking, sizes hotbar to 3, sets initial active slot).
+	UInventoryComponent();
 
-public: 
-	UInventoryComponent(); // constructor function
+	// ======================
+	// Public Gameplay API
+	// ======================
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Inventory")
-	TArray<FItemStack> Hotbar;  // create an array to hold are different items 
+	// Add Count copies of Item to the inventory.
+	// Returns true if any amount was successfully added (even partially),
+	// false if nothing could be added (e.g., full and blocked by rules).
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	bool AddItem(UItemDef* Item, int32 Count);
 
-	UPROPERTY(VisibleInstanceOnly, BlueprintReadOnly, Category = "inventory")
-	int32 ActiveSlotIndex = 0; // this will tell us which slot is currently equipped/ selected
+	// Find the index of a slot that already contains this Item (and has Count > 0).
+	// Returns INDEX_NONE (-1) if no such slot exists.
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	int32 FindSlotWithItem(UItemDef* Item) const;
 
-	bool AddItem(UItemDef* Item, int32 Count); 
-	// the fucntion that will allow us to add an item to are invtory it needs to have a reference tpo the item and how many we have to see if more can be added 
-
-
+	// Change which hotbar slot is considered "active" (e.g., what the player is holding).
+	// This does not validate whether the slot is empty — UI/game logic can handle that.
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
 	void SelectSlot(int32 Index);
-	//This function is for changing which inventory slot is currently active (selected) — not for using or consuming the item yet.
 
-
+	// Use/consume one unit from the active slot.
+	// Returns false if the active slot is invalid or empty.
+	// NOTE: This is a stub for now; in a complete system, this would trigger item behavior via UItemDef.
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
 	bool UseActive(AActor* User);
-		// Use/consume currently selected slot (triggered by Mouse/Use)
 
-private: 
-	int32 TryStackIntoExisting(UItemDef* Item, int32 Count);
-	// Try to stack into existing slot with same item type. Returns remaining count.
+	// ======================
+	// Data (Editable/Visible)
+	// ======================
 
-	bool TryPlaceFirstInEmpty(UItemDef* Item, int32 Count);
-		// Place into first empty slot; auto-equips that slot. Returns true if placed.
+	// The fixed hotbar array. In constructor we size this to 3 (indices 0..2).
+	// Marked EditAnywhere so designers can inspect in editor; BlueprintReadOnly so BP can read the state.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Inventory")
+	TArray<FItemStack> Hotbar;
 
+	// Which slot index is currently active/selected. Defaults to 0.
+	// Note: Validity is NOT guaranteed (UI/gameplay should handle empty vs valid slots).
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Inventory")
+	int32 ActiveSlotIndex = 0;
 
-	//Utility lookups
-	int32 FindSlotWithItem(UItemDef* Item) const;
-	// try and find which slot has this item type
+private:
+	// ======================
+	// Internal Helpers (CPP)
+	// ======================
 
-		int32 FindFirstEmptySlot() const;
-	// try and find the first empty slot with no item
+	// Finds the first slot that is "empty" (no Item OR Count <= 0).
+	// Returns INDEX_NONE if there is no available empty slot.
+	int32 FindFirstEmptySlot() const;
 
-	bool  HasThreeUniqueTypes() const;
-	//checking if we already have three unique items to determine if we can hold anythting else
+	// Returns true if the hotbar already contains 3 or more UNIQUE item types.
+	// Used to enforce the "max 3 unique types" rule before introducing a brand-new type.
+	bool HasThreeUniqueTypes() const;
 };
-

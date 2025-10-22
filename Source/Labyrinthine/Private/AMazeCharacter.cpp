@@ -14,6 +14,13 @@
 #include "Components/SphereComponent.h"
 #include "DrawDebugHelpers.h"
 
+//interactions
+#include "Interactable.h"
+
+#include "InventoryComponent.h"
+
+
+
 
 // Sets default values
 AAMazeCharacter::AAMazeCharacter()
@@ -48,6 +55,8 @@ AAMazeCharacter::AAMazeCharacter()
     InteractRange->SetCollisionResponseToAllChannels(ECR_Ignore); 
     // Set the InteractRange sphere to ignore all collision channels by default.
 // (We'll selectively enable overlaps for specific channels later, e.g., interactables or pawns.)
+
+    Inventory = CreateDefaultSubobject<UInventoryComponent>(TEXT("Inventory"));
 
 
 
@@ -194,36 +203,24 @@ void AAMazeCharacter::OnJumpReleased(const FInputActionValue& /*Value*/)
 
 void AAMazeCharacter::OnInteractPressed(const FInputActionValue& Value)
 {
-    if (!FocusedActor.IsValid()) // if focus actor is not vallid so theres no interactable object in front of us when we press the interact key
+    if (!FocusedActor.IsValid())
     {
-       
         if (GEngine)
         {
             GEngine->AddOnScreenDebugMessage(-1, 1.5f, FColor::Red, TEXT("No interactable in focus"));
-            return;
-            // Check if the unreal engine exists before using it (safety check).
-// If it does, display a red debug message on-screen for 1.5 seconds saying "No interactable in focus".
-// The -1 key means each message gets its own new line instead of replacing old ones.
-// This is a quick visual debug tool to confirm no object is currently in focus when interacting.
-// After showing the message, we immediately return to stop running the rest of the function.
         }
-            
-        
+        return;
     }
 
-    FString Name = FocusedActor->GetName(); // get the string value name of are focused actor 
-        if (GEngine)
-        {
-            GEngine->AddOnScreenDebugMessage(-1, 1.5f, FColor::Green, FString::Printf(TEXT("Interact with: %s"), *Name));
-     
-                // If it does, display a green debug message on-screen for 1.5 seconds saying " interact with (whatever object)".
-                // The -1 key means each message gets its own new line instead of replacing old ones.
-                // This is a quick visual debug tool to confirm that an  object is currently in focus when interacting.
-              
+    // (Optional) show what we’re interacting with
+    if (GEngine)
+    {
+        const FString Name = FocusedActor->GetName();
+        GEngine->AddOnScreenDebugMessage(-1, 1.5f, FColor::Green,
+            FString::Printf(TEXT("Interact with: %s"), *Name));
+    }
 
-        }
-
-
+    IInteractable::Execute_Interact(FocusedActor.Get(), /* Interactor: */ this); // call the interact funtion   on the specific ineractable object
 }
 
 
