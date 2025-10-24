@@ -203,24 +203,29 @@ void AAMazeCharacter::OnJumpReleased(const FInputActionValue& /*Value*/)
 
 void AAMazeCharacter::OnInteractPressed(const FInputActionValue& Value)
 {
-    if (!FocusedActor.IsValid())
+    AActor* Target = LastInteractHit.GetActor();
+
+    if (!Target)
     {
         if (GEngine)
-        {
-            GEngine->AddOnScreenDebugMessage(-1, 1.5f, FColor::Red, TEXT("No interactable in focus"));
-        }
+            GEngine->AddOnScreenDebugMessage(-1, 1.5f, FColor::Red, TEXT("No valid interact hit"));
         return;
     }
 
-    // (Optional) show what we’re interacting with
-    if (GEngine)
+    if (!Target->GetClass()->ImplementsInterface(UInteractable::StaticClass()))
     {
-        const FString Name = FocusedActor->GetName();
-        GEngine->AddOnScreenDebugMessage(-1, 1.5f, FColor::Green,
-            FString::Printf(TEXT("Interact with: %s"), *Name));
+        if (GEngine)
+            GEngine->AddOnScreenDebugMessage(-1, 1.5f, FColor::Yellow, TEXT("Hit non-interactable object"));
+        return;
     }
 
-    IInteractable::Execute_Interact(FocusedActor.Get(), /* Interactor: */ this); // call the interact funtion   on the specific ineractable object
+    IInteractable::Execute_Interact(Target, this);
+
+    if (GEngine)
+    {
+        GEngine->AddOnScreenDebugMessage(-1, 1.5f, FColor::Green,
+            FString::Printf(TEXT("Interacted with: %s"), *Target->GetName()));
+    }
 }
 
 
@@ -269,158 +274,77 @@ void AAMazeCharacter::SetupDefaultInputMapping()
 
 void AAMazeCharacter::UpdateInteractionFocus()
 {
+    if (!Camera) return;
 
-    if (!Camera) // if there is no camera 
+    const float StartOffset = 200.f;
+    const float Distance = InteractTraceDistance;
+    const float Radius = InteractTraceRadius;
+
+    const FVector CamPos = Camera->GetComponentLocation();
+    const FVector CamForward = Camera->GetComponentRotation().Vector();
+    const FVector Start = CamPos + CamForward * StartOffset;
+    const FVector End = Start + CamForward * Distance;
+
+    FCollisionQueryParams Params(SCENE_QUERY_STAT(InteractSweep), true, this);
+    Params.AddIgnoredActor(this);
+
+    TArray<FHitResult> Hits;
+    LastInteractHit = FHitResult(); // reset each frame
+
+    const bool bAny = GetWorld()->SweepMultiByChannel(
+        Hits, Start, End, FQuat::Identity,
+        ECC_GameTraceChannel1,
+        FCollisionShape::MakeSphere(Radius),
+        Params
+    );
+
+    if (bAny)
     {
-        FocusedActor = nullptr; 
-        // set the pointer that stiores the interactable object were looking at (focused actor) to null cause we cant use the camera as the point to start the  ray to see what the [layer is looking at
+        // We'll take the first blocking hit that implements Interactable
+        for (const FHitResult& H : Hits)
+        {
+            if (!(H.bBlockingHit || H.bStartPenetrating))
+                continue;
 
+            AActor* A = H.GetActor();
+            if (!A) continue;
 
-        return; // bail out of the function early cause of the reason mentioned right above this/
+            if (A->GetClass()->ImplementsInterface(UInteractable::StaticClass()))
+            {
+                LastInteractHit = H;
+                break; // found a valid interactable hit
+            }
+        }
     }
-
-    const FVector Start = Camera->GetComponentLocation(); // creating a vector to store the location of the camera every frame  cause this will be the origin point of are ray
-
-
-    const FVector End = Start + (Camera->GetComponentRotation().Vector() * 350.f);
-    // Determine where the line trace (raycast) should end in world space.
-// 1️⃣ Start with the camera's current world position as the origin of the ray.
-// 2️⃣ Get the camera's current world space rotation and convert it to a normalized forward direction vector in world space using .Vector().
-// .Vector() simply takes that worldspace rotation of the camera here and turns it into a unit forward direction vector that points in that same world direction.
-//     - This gives us the direction the player is looking, with a length of 1 unit.
-// so if for example there looking right  the vector would be (0,1,0) 
-//     // In Unreal's coordinate system, X = forward, Y = right, and Z = up.
-// So a direction vector of (0, 1, 0) means no forward or upward movement,
-// only movement 1 unit to the right along the Y axis.
-// 3️⃣ Multiply that direction by 350.f to extend the vector 350 Unreal units (≈3.5 meters) forward.
-//     - This defines how far ahead the player can interact.
-// 4️⃣ Add that forward offset to the camera's starting position to get the final endpoint in world space.
-//     - The result is the "End" point of the trace — 350 units directly in front of the player's view.
-
-    FHitResult Hit;
-    // Create an empty FHitResult struct named "Hit".
-// This struct will be filled with detailed information if our line trace collides with something.
-// It stores data such as the actor that was hit, the exact impact point, the surface normal,
-// the hit distance, and whether the trace was blocked or just overlapped.
-// FHitResult is a built-in Unreal struct that contains variables for all the data a trace can return,
-// such as the hit location, impact point, surface normal, hit actor, component, distance, and more.
-// By declaring our own instance here, we allocate space for those variables,
-// allowing Unreal's line trace function to automatically fill this struct(class)  with detailed hit information.
-
-    FCollisionQueryParams Params(TEXT("InteractTrace"), false, this);
-        // Create a new FCollisionQueryParams instance named "Params" by calling its constructor.
- // In C++, anytime you place parentheses () immediately after a type name during variable creation,
- // you are calling that type’s constructor and passing the values inside the parentheses as arguments.
- //
- // FCollisionQueryParams is a struct that stores settings for how a collision or line trace should behave.
- // Its constructor takes three parameters:
- //   1. TEXT("InteractTrace") → a name tag for identifying this trace in debugging or logs.
- //   2. false → disables complex (per-triangle) tracing and instead uses simple collision for performance.
- //   3. this → tells Unreal to ignore the actor running the trace, preventing it from hitting itself.
- //
- // Behind the scenes, this line calls FCollisionQueryParams::FCollisionQueryParams(...)
- // and initializes all of the struct’s internal variables accordingly.
-    Params.AddIgnoredActor(this); // this does nothing new its just reduntant to exactly what we did right above. this will likely be removed
-
-    const ECollisionChannel Channel = ECC_GameTraceChannel1;
-    // Use our custom InteractTrace channel (ECC_GameTraceChannel1) instead of ECC_Visibility.
-// Rationale:
-// - Isolation: keeps interaction raycasts separate from other systems that also use Visibility
-//   (AI sight, camera checks, UI traces), avoiding accidental behavior changes.
-// - Control: we can fine-tune responses per asset—pickups/doors/walls “Block” InteractTrace,
-//   the player and irrelevant actors “Ignore” it—without touching their Visibility settings.
-// - LOS enforcement: because world geometry Blocks InteractTrace, the ray can’t pass through walls,
-//   preventing “pickup through wall” bugs.
-// - Scalability & clarity: future debugging and content setup are simpler (“Does it block InteractTrace?”)
-//   and designers can tweak this channel without side effects elsewhere.
-
-    const bool bHit = GetWorld()->LineTraceSingleByChannel(Hit, Start, End, Channel, Params);  //THIS IS THE ACTUAL LINE THAT DOES THE RAY CAST CREATING THE LINE
-// So this creates a boolean variable that will store whether the trace hit something or not.
-
-
-// GetWorld()
-// 'GetWorld()' is a built-in Unreal function that returns a pointer to the current UWorld object.
-// The UWorld represents the entire game world (level, actors, physics, etc.).
-// From the world object, we can call functions that perform world-level operations like traces and spawning actors.
-// LineTraceSingleByChannel(...)
-// This is the actual function being called on the UWorld object.
-// It performs a *raycast* (a line trace) through the world along a line between two points (Start → End).
-// It checks what objects (if any) the line collides with, using the specified collision channel.
-
-// (Hit, Start, End, Channel, Params)
-// These are the function’s parameters, passed in order:
-// 1️⃣ 'Hit' — an output variable (FHitResult) that stores detailed info about what the trace hit
-//             (like the actor, impact point, normal, distance, etc.).
-// 2️⃣ 'Start' — the starting location of the line trace in world space (usually the camera or character position).
-// 3️⃣ 'End' — the ending location of the trace (typically Start + ForwardVector * TraceDistance).
-// 4️⃣ 'Channel' — specifies which collision channel to use (e.g., ECC_Visibility, ECC_InteractTrace).
-//                 This tells the engine which objects to consider as "traceable".
-// 5️⃣ 'Params' — a struct (FCollisionQueryParams) that defines extra options for the trace,
-//                such as which actors to ignore, whether to use complex tracing, etc.
-// Altogether, this line:
-// Sends out a single invisible ray (line trace) from 'Start' to 'End' in the world,
-// checking for the first object that blocks the specified collision 'Channel'.
-//     "LineTraceSingleByChannel" Returns a bool  its one of the parameters of the function  so EX: bool UWorld::LineTraceSingleByChannel()
-// If something is hit, 'Hit' is filled with data about it, and 'bHit' is set to true; otherwise, it's false.
-
 
 #if WITH_EDITOR
-    // #if WITH_EDITOR is a preprocessor directive used by Unreal Engine.
-// It checks whether the code is being compiled in the Unreal Editor build configuration.
-// If WITH_EDITOR is true (inside the editor), the enclosed code is included and compiled.
-// If it's false (in a packaged/shipping build), the compiler completely skips this block.
-// This is typically used to include editor-only or debug-only code,
-// such as DrawDebugLine or DrawDebugPoint, so those visualizations
-// appear in the editor but are excluded from the final game for performance and cleanliness.
-
-    DrawDebugLine(GetWorld(), Start, End, bHit ? FColor::Green : FColor::Red, false, 0.f, 0,1.5f);
-    // were gonna create a debug line
-    // calling get world tells the debug function what it needs to know (what world were in so it knows where its going)
-    // we then pass in start as the beginning position of the line
-    // we then pass in end and the end postion of the line,
-    // we then do an iff check that says if we did hit something set the color to green if we didnt set it to red. 
-    // we then pass in false for persisitent lines. 
-    // we then pass in a float for its life time how long we want it to last in this case zero cause it is constanly just gonna be updated with tick  we dont want lingering lines
-    // we then pass in its depth priotoity as zero i assume this means firs priority
-    // and lastly we pass in its thickness to determine how large we want the line to be
-
-
-    if (bHit) // if our line ray cast hit something
+    // ---------------- Debug viz ----------------
     {
-        DrawDebugPoint(GetWorld(), Hit.ImpactPoint, 8.f, FColor::Yellow, false, 0.f, 0);
-        // we're going to create a debug point
-   // calling GetWorld() again tells the debug function which world we're drawing in
-   // we then pass in Hit.ImpactPoint as the location where the line trace actually hit something in the world
-   // we then pass in 8.f to define the size of the point (how large the visualized dot should appear)
-   // we then pass in FColor::Yellow to color the point so it stands out from the line
-   // we then pass in false for persistent lines, meaning we don't want it to stay in the world after this frame
-   // we then pass in 0.f for lifetime, because we only want it visible for one tick before being redrawn again
-   // lastly, we pass in 0 for depth priority, which defines its render order compared to other debug elements
+        const FVector Path = End - Start;
+        const float PathLen = Path.Size();
+        const FVector Mid = Start + Path * 0.5f;
+        const FQuat Rot = FRotationMatrix::MakeFromZ(Path.GetSafeNormal()).ToQuat();
+
+        DrawDebugCapsule(GetWorld(), Mid, PathLen * 0.5f, Radius, Rot,
+            FColor(80, 80, 80), false, 0.f, 0, 1.25f);
+
+        for (const FHitResult& H : Hits)
+        {
+            if (H.bBlockingHit || H.bStartPenetrating)
+            {
+                DrawDebugSphere(GetWorld(), H.ImpactPoint, 6.f, 12,
+                    (AActor*)H.GetActor() == (AActor*)LastInteractHit.GetActor() ?
+                    FColor::Green : FColor::Yellow,
+                    false, 0.f, 0, 1.25f);
+            }
+        }
     }
-
-
-
-
-#endif //#endif simply marks the end of a conditional preprocessor block that started with #if, #ifdef, or #ifndef.
-
-
-    AActor* NewCandidate = bHit ? Hit.GetActor() : nullptr;
-    // creates a pointer to AActor called bHit
-    // if bHit is true (our ray cast hit an object with in are defined channel so presumably it hit an interactable object)  
-    // then we will use the hit result struct named Hit  that stores info aboutthe hit object to call the get actr function that will return the memory addres of the hit actor
-    // then store it in the NewCandidate pointer
-    // if bHit was not true (our ray cast did not hit an object with in are defined channel so presumably it did not hit an interactable object)
-    // then the pointer will be set to null to avoid any errors
-
-
-    if (NewCandidate && !IsWithinInteractRange(NewCandidate))
-    {
-        NewCandidate = nullptr;
-    }
-
-    FocusedActor = NewCandidate;
-
+#endif
 }
+
+
+
+
 
 
 bool AAMazeCharacter::IsWithinInteractRange(const AActor* Target) const

@@ -30,6 +30,16 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "Health")
 	float startingHealth = 100;
 
+	UPROPERTY(EditAnywhere, Category = "Interaction|Trace", meta = (ClampMin = "50", ClampMax = "5000"))
+	float InteractTraceDistance = 500.f;   // how far the sweep goes
+
+	UPROPERTY(EditAnywhere, Category = "Interaction|Trace", meta = (ClampMin = "0", ClampMax = "100"))
+	float InteractTraceRadius = 16.f;      // how wide the sweep is
+
+	UPROPERTY(EditAnywhere, Category = "Interaction|Trace", meta = (ClampMin = "0", ClampMax = "45"))
+	float InteractMaxAimAngleDeg = 18.f;   // optional aim gating (set to 0 to disable)
+
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaTime) override;
@@ -75,18 +85,10 @@ protected:
 	// creating the pointer that will store the memory address if the sphere component that determines if were with in interact range
 	// Setting "InteractRange" to nullptr is defensive programming — it avoids undefined behavior if something tries to access it before the constructor assigns it.
 
-
+		// The most recent trace hit result — used to interact directly
 	UPROPERTY(VisibleInstanceOnly, Category = "Interaction")
-	TWeakObjectPtr<AActor> FocusedActor;
-	// this will be the interactable object the line trace is looking at 
-	//It’s just a reference that says: “Hey, this is the actor the player’s crosshair is pointing at and can currently interact with.”
-	//"TWeakObjectPtr" is A safe, automatically-invalidating reference to a UObject of type AActor (or any subclass).
-// TWeakObjectPtr behaves like a pointer but does not keep the object alive.
-// If the referenced actor is destroyed or garbage-collected, so we in this case we can no longer see the interactable object in theline trace this pointer auto-nulls itself
-// (IsValid() returns false, Get() returns nullptr) — preventing dangling-pointer crashes.
-// Commonly used for transient references like "currently focused" or "target" objects.
-// "<AActor> is simply defining the type of object the pointer is allowed to store
-	// and focused actor is just the name
+	FHitResult LastInteractHit;
+
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
 	UInventoryComponent* Inventory = nullptr;

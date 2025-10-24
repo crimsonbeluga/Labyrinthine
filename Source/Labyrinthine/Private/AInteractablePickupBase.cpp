@@ -13,7 +13,6 @@ AAInteractablePickupBase::AAInteractablePickupBase()
 
 	// Optional floating prompt widget
 	PromptWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("Prompt"));
-	PromptWidget->SetupAttachment(RootComponent);
 	PromptWidget->SetVisibility(false); // hidden until focused
 
 	Mesh->SetCollisionObjectType(ECC_WorldDynamic); //“This object is a movable, interactive world object (not part of the static world geometry).”
@@ -35,6 +34,9 @@ AAInteractablePickupBase::AAInteractablePickupBase()
 	//What: Also blocks the built-in Visibility channel.
 //Why: If some systems(debug tools, UI line - of - sight checks, generic trace helpers) use Visibility instead of your custom channel, 
 // the pickup will still be hittable / occluded properly. It’s optional—useful if any of your traces are on Visibility now or might be later.
+
+	InteractTarget = CreateDefaultSubobject<USceneComponent>(TEXT("InteractTarget"));
+	InteractTarget->SetupAttachment(RootComponent);
 }
 
 /// Return the localized text prompt shown when the player looks at the item
