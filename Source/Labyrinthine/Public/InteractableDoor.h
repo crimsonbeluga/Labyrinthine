@@ -39,6 +39,6 @@ public:
 
 	virtual FText GetPromptText_Implementation() const override;
 
-
+	void OpenDoor(float DeltaTime);
 	
 };

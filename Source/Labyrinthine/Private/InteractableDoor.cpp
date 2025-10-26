@@ -46,3 +46,8 @@ void AInteractableDoor::Tick(float DeltaTime)
  {
 	 return FText::GetEmpty();
  }
+
+ void AInteractableDoor::OpenDoor(float DeltaTime)
+ {
+
+ }
