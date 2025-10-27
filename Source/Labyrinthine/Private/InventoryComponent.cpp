@@ -3,6 +3,10 @@
 // It manages: a fixed-size hotbar, stacking logic, adding new items, selecting slots, and consuming items.
 
 #include "InventoryComponent.h" // Corresponding header for declarations of UInventoryComponent and FItemStack
+// InventoryComponent.cpp (top)
+#include "ItemUseBehavior.h"
+#include "AMazeCharacter.h"
+
 #include "ItemDef.h"            // Defines UItemDef (the data that describes an item type: name, icon, MaxStack, etc.)
 #include "Engine/Engine.h"
 
@@ -216,7 +220,8 @@ void UInventoryComponent::SelectSlot(int32 Index)
 // =====================================
 // UseActive: consume/use the active item
 // =====================================
-bool UInventoryComponent::UseActive(AActor* /*User*/)
+// InventoryComponent.cpp (method)
+bool UInventoryComponent::UseActive(AActor* User)
 {
 	if (!Hotbar.IsValidIndex(ActiveSlotIndex))
 	{
@@ -225,28 +230,48 @@ bool UInventoryComponent::UseActive(AActor* /*User*/)
 	}
 
 	FItemStack& Slot = Hotbar[ActiveSlotIndex];
-
 	if (!Slot.isValid())
 	{
 		UE_LOG(LogInventory, Log, TEXT("[Inventory] UseActive: Slot %d is empty"), ActiveSlotIndex);
 		return false;
 	}
 
-	// TODO: trigger item behavior via ItemDef.
-	UE_LOG(LogInventory, Log, TEXT("[Inventory] UseActive: Using 1x %s from Slot=%d (Before=%d)"),
-		Slot.Item ? *Slot.Item->GetName() : TEXT("NULL"), ActiveSlotIndex, Slot.Count);
-
-	Slot.Count -= 1;
-
-	if (Slot.Count <= 0)
+	UItemDef* Def = Slot.Item;
+	if (!Def)
 	{
-		UE_LOG(LogInventory, Log, TEXT("[Inventory] UseActive: Slot %d depleted -> clearing"), ActiveSlotIndex);
-		Slot.Item = nullptr;
-		Slot.Count = 0;
+		UE_LOG(LogInventory, Warning, TEXT("[Inventory] UseActive: Slot %d has null ItemDef"), ActiveSlotIndex);
+		return false;
 	}
 
-	return true;
+	bool bUsedOK = false;
+
+	if (Def->UseBehavior)
+	{
+		AAMazeCharacter* AsChar = Cast<AAMazeCharacter>(User ? User : GetOwner());
+		bUsedOK = Def->UseBehavior->Use(AsChar, Def);
+	}
+	else
+	{
+		UE_LOG(LogInventory, Warning, TEXT("[Inventory] UseActive: %s has no UseBehavior; not consuming"), *Def->GetName());
+	}
+
+	if (bUsedOK && Def->bConsumable)
+	{
+		UE_LOG(LogInventory, Log, TEXT("[Inventory] UseActive: Consuming 1x %s from Slot=%d (Before=%d)"),
+			*Def->GetName(), ActiveSlotIndex, Slot.Count);
+
+		Slot.Count -= 1;
+		if (Slot.Count <= 0)
+		{
+			UE_LOG(LogInventory, Log, TEXT("[Inventory] UseActive: Slot %d depleted -> clearing"), ActiveSlotIndex);
+			Slot.Item = nullptr;
+			Slot.Count = 0;
+		}
+	}
+
+	return bUsedOK;
 }
+
 
 // =============================
 // HasItem / ConsumeItem (debug)
