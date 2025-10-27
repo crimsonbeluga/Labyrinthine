@@ -89,6 +89,13 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Inventory")
 	int32 ActiveSlotIndex = 0;
 
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	bool HasItem(const UItemDef* Item, int32 MinCount = 1) const;
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	bool ConsumeItem(const UItemDef* Item, int32 Amount = 1);
+
+
 private:
 	// ======================
 	// Internal Helpers (CPP)
@@ -101,4 +108,7 @@ private:
 	// Returns true if the hotbar already contains 3 or more UNIQUE item types.
 	// Used to enforce the "max 3 unique types" rule before introducing a brand-new type.
 	bool HasThreeUniqueTypes() const;
+
+
+
 };

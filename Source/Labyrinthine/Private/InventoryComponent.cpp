@@ -4,6 +4,9 @@
 
 #include "InventoryComponent.h" // Corresponding header for declarations of UInventoryComponent and FItemStack
 #include "ItemDef.h"            // Defines UItemDef (the data that describes an item type: name, icon, MaxStack, etc.)
+#include "Engine/Engine.h"
+
+DEFINE_LOG_CATEGORY_STATIC(LogInventory, Log, All);
 
 // ===============================
 // Constructor: UInventoryComponent
@@ -21,6 +24,8 @@ UInventoryComponent::UInventoryComponent()
 	// Initialize the currently selected hotbar slot index.
 	// 0 means the first slot is "active" by default (even if empty).
 	ActiveSlotIndex = 0;
+
+	UE_LOG(LogInventory, Log, TEXT("[Inventory] Constructed. HotbarSize=%d ActiveSlotIndex=%d"), Hotbar.Num(), ActiveSlotIndex);
 }
 
 // ======================================================
@@ -30,21 +35,23 @@ UInventoryComponent::UInventoryComponent()
 // If no such slot exists, returns INDEX_NONE (-1).
 int32 UInventoryComponent::FindSlotWithItem(UItemDef* Item) const
 {
-	// Defensive guard: if no item pointer was provided, return "not found".
-	if (!Item) return INDEX_NONE;
+	if (!Item)
+	{
+		UE_LOG(LogInventory, Warning, TEXT("[Inventory] FindSlotWithItem(NULL) -> INDEX_NONE"));
+		return INDEX_NONE;
+	}
 
-	// Iterate over each hotbar slot by index.
 	for (int32 i = 0; i < Hotbar.Num(); ++i)
 	{
-		// Check if this slot holds the SAME item type pointer AND has at least one in the stack.
 		if (Hotbar[i].Item == Item && Hotbar[i].Count > 0)
 		{
-			// Found a matching stack; return its index.
+			UE_LOG(LogInventory, Verbose, TEXT("[Inventory] FindSlotWithItem(%s) -> %d (Count=%d)"),
+				*Item->GetName(), i, Hotbar[i].Count);
 			return i;
 		}
 	}
 
-	// No slot matched the item type; signal "not found".
+	UE_LOG(LogInventory, Verbose, TEXT("[Inventory] FindSlotWithItem(%s) -> INDEX_NONE"), *Item->GetName());
 	return INDEX_NONE;
 }
 
@@ -57,186 +64,261 @@ int32 UInventoryComponent::FindFirstEmptySlot() const
 {
 	for (int32 i = 0; i < Hotbar.Num(); ++i)
 	{
-		// Empty if it either lacks an Item pointer OR has zero-or-negative count.
 		if (!Hotbar[i].Item || Hotbar[i].Count <= 0)
+		{
+			UE_LOG(LogInventory, Verbose, TEXT("[Inventory] FindFirstEmptySlot -> %d"), i);
 			return i;
+		}
 	}
+	UE_LOG(LogInventory, Verbose, TEXT("[Inventory] FindFirstEmptySlot -> INDEX_NONE"));
 	return INDEX_NONE;
 }
 
 // ===========================================================
 // HasThreeUniqueTypes: enforce "max 3 unique item types" rule
 // ===========================================================
-// Builds a TSet of unique UItemDef* seen across non-empty slots.
-// If the set size is >= 3, we already have 3 or more unique types.
 bool UInventoryComponent::HasThreeUniqueTypes() const
 {
-	TSet<UItemDef*> Unique; // Set automatically ignores duplicates.
+	TSet<UItemDef*> Unique;
 
-	// Range-based for: examines each stack in the hotbar.
 	for (const FItemStack& S : Hotbar)
 	{
-		// Only count valid stacks (have an Item assigned and a positive Count).
 		if (S.Item && S.Count > 0)
 		{
-			// Insert the item type into the set (duplicates are ignored).
 			Unique.Add(S.Item);
 		}
 	}
 
-	// If we already have 3 or more distinct types, return true.
-	return Unique.Num() >= 3;
+	const int32 UniqueCount = Unique.Num();
+	UE_LOG(LogInventory, Verbose, TEXT("[Inventory] HasThreeUniqueTypes -> %s (Unique=%d)"),
+		UniqueCount >= 3 ? TEXT("TRUE") : TEXT("FALSE"), UniqueCount);
+
+	return UniqueCount >= 3;
 }
 
 // =============================================
 // AddItem: try to add N copies of a given item.
 // =============================================
-// Behavior:
-// 1) If an existing stack of the same type is found, try to add to that stack up to MaxStack,
-//    then (optionally) spill remainder into empty slots as new stacks of the SAME item.
-// 2) If no existing stack is found, and we are allowed to add a NEW item type,
-//    place a new stack into the first empty slot (respect MaxStack), then spill remainder into more empties.
-// Returns true if any amount was successfully added; false otherwise.
 bool UInventoryComponent::AddItem(UItemDef* Item, int32 Count)
 {
-	// Validate input: cannot add a null item or a non-positive quantity.
-	if (!Item || Count <= 0) return false;
+	if (!Item || Count <= 0)
+	{
+		UE_LOG(LogInventory, Warning, TEXT("[Inventory] AddItem invalid args (Item=%s, Count=%d)"),
+			Item ? *Item->GetName() : TEXT("NULL"), Count);
+		return false;
+	}
+
+	UE_LOG(LogInventory, Log, TEXT("[Inventory] AddItem(%s, %d) BEGIN"), *Item->GetName(), Count);
 
 	// 1) Try to stack into an existing slot of the same item
-	// Use C++17 if-with-initializer to capture the found slot index inline.
 	if (int32 Slot = FindSlotWithItem(Item); Slot != INDEX_NONE)
 	{
-		// MaxStack is the per-item maximum stack size, but we ensure a minimum of 1 for safety.
 		const int32 MaxStack = FMath::Max(1, Item->MaxStack);
-
-		// FreeSpace is how many more of this item we can place in the found stack.
 		const int32 FreeSpace = MaxStack - Hotbar[Slot].Count;
 
-		// If the stack is already full, we cannot add to THIS stack.
-		// (We still might be able to spill to empty slots, see below after ToAdd.)
-		if (FreeSpace <= 0) return false;
+		if (FreeSpace <= 0)
+		{
+			UE_LOG(LogInventory, Log, TEXT("[Inventory] AddItem: Existing stack full (Slot=%d Count=%d MaxStack=%d) -> FALSE"),
+				Slot, Hotbar[Slot].Count, MaxStack);
+			return false;
+		}
 
-		// ToAdd is the number we can safely add to this stack without exceeding MaxStack.
-		// It is the min of the number we want to add and the stack's free space.
 		const int32 ToAdd = FMath::Min(Count, FreeSpace);
-
-		// Apply the addition to the existing stack.
 		Hotbar[Slot].Count += ToAdd;
+		UE_LOG(LogInventory, Log, TEXT("[Inventory] AddItem: Stacked %d into Slot=%d (Now=%d/%d)"),
+			ToAdd, Slot, Hotbar[Slot].Count, MaxStack);
 
-		// overflow: optionally open new stacks in empty slots
-		// After filling the existing stack as much as possible,
-		// compute how many items still remain to be added.
 		int32 Remainder = Count - ToAdd;
 
-		// While we still have items to place, keep looking for empty slots
-		// and create new stacks of the SAME item type (this does NOT increase unique types).
 		while (Remainder > 0)
 		{
 			const int32 Empty = FindFirstEmptySlot();
-			// If there are no empty slots left, abort the loop (we added as much as we could).
 			if (Empty == INDEX_NONE) break;
 
-			// Each new stack can hold up to MaxStack.
 			const int32 Chunk = FMath::Min(Remainder, MaxStack);
-
-			// Initialize the new stack with this item type and the chunk amount.
 			Hotbar[Empty].Item = Item;
 			Hotbar[Empty].Count = Chunk;
-
-			// Decrease the remainder by however many we just placed.
 			Remainder -= Chunk;
+
+			UE_LOG(LogInventory, Log, TEXT("[Inventory] AddItem: Opened new stack %d of %s in Slot=%d (Remainder=%d)"),
+				Chunk, *Item->GetName(), Empty, Remainder);
 		}
 
-		// We consider this a success if we added anything at all (which we did here).
+		UE_LOG(LogInventory, Log, TEXT("[Inventory] AddItem(%s) END -> TRUE"), *Item->GetName());
 		return true;
 	}
 
 	// 2) No existing stack ? create a new stack if we can introduce a new type
-	// Enforce the "3 unique item types" policy: if already at 3, we cannot add a NEW type.
-	if (HasThreeUniqueTypes()) return false;
+	if (HasThreeUniqueTypes())
+	{
+		UE_LOG(LogInventory, Log, TEXT("[Inventory] AddItem: Already at 3 unique types -> FALSE"));
+		return false;
+	}
 
-	// Find an empty slot to seed the first stack for this new item type.
 	const int32 Empty = FindFirstEmptySlot();
-	if (Empty == INDEX_NONE) return false; // No space available at all.
+	if (Empty == INDEX_NONE)
+	{
+		UE_LOG(LogInventory, Log, TEXT("[Inventory] AddItem: No empty slots -> FALSE"));
+		return false;
+	}
 
-	// Respect per-item MaxStack (enforce minimum 1 for safety).
 	const int32 MaxStack = FMath::Max(1, Item->MaxStack);
-
-	// ToAdd is how many we can put into the first new stack.
 	const int32 ToAdd = FMath::Min(Count, MaxStack);
 
-	// Create the new stack in the empty slot.
 	Hotbar[Empty].Item = Item;
 	Hotbar[Empty].Count = ToAdd;
+	UE_LOG(LogInventory, Log, TEXT("[Inventory] AddItem: Seeded new stack in Slot=%d Count=%d/%d"),
+		Empty, ToAdd, MaxStack);
 
 	// Auto-select if nothing valid selected
-	// If the current ActiveSlotIndex is out of bounds OR points to an invalid/empty stack,
-	// automatically select the slot we just filled so the player "holds" the new item by default.
 	if (!Hotbar.IsValidIndex(ActiveSlotIndex) || !Hotbar[ActiveSlotIndex].isValid())
 	{
 		ActiveSlotIndex = Empty;
+		UE_LOG(LogInventory, Verbose, TEXT("[Inventory] Auto-selected Slot=%d"), ActiveSlotIndex);
 	}
 
-	// overflow into other empty slots if available (same item type, doesn’t increase unique types)
-	// If there are still more items left after filling the first stack,
-	// keep placing additional stacks into other empty slots, also respecting MaxStack.
 	int32 Remainder = Count - ToAdd;
 	while (Remainder > 0)
 	{
 		int32 NextEmpty = FindFirstEmptySlot();
-		// If we run out of empty slots, stop trying to place remainder.
 		if (NextEmpty == INDEX_NONE) break;
 
 		const int32 Chunk = FMath::Min(Remainder, MaxStack);
 		Hotbar[NextEmpty].Item = Item;
 		Hotbar[NextEmpty].Count = Chunk;
 		Remainder -= Chunk;
+
+		UE_LOG(LogInventory, Log, TEXT("[Inventory] AddItem: Extra stack %d of %s in Slot=%d (Remainder=%d)"),
+			Chunk, *Item->GetName(), NextEmpty, Remainder);
 	}
 
-	// We successfully placed at least the first stack (and possibly more).
+	UE_LOG(LogInventory, Log, TEXT("[Inventory] AddItem(%s) END -> TRUE"), *Item->GetName());
 	return true;
 }
 
 // ==========================================
 // SelectSlot: change the active hotbar index
 // ==========================================
-// Only updates if the provided index is within bounds.
-// (No validation of whether the slot is empty; the UI/gameplay can decide that behavior.)
 void UInventoryComponent::SelectSlot(int32 Index)
 {
 	if (Hotbar.IsValidIndex(Index))
 	{
+		UE_LOG(LogInventory, Log, TEXT("[Inventory] SelectSlot(%d) (Prev=%d)"), Index, ActiveSlotIndex);
 		ActiveSlotIndex = Index;
+	}
+	else
+	{
+		UE_LOG(LogInventory, Warning, TEXT("[Inventory] SelectSlot(%d) OUT OF RANGE (HotbarSize=%d)"),
+			Index, Hotbar.Num());
 	}
 }
 
 // =====================================
 // UseActive: consume/use the active item
 // =====================================
-// Returns false if the active index is invalid OR the slot is empty.
-// Otherwise decrements Count by 1; if Count drops to 0, clears the slot.
-// NOTE: This is a placeholder; in a full system you'd also trigger the item's effect here.
 bool UInventoryComponent::UseActive(AActor* /*User*/)
 {
-	// Validate the active index is in range.
-	if (!Hotbar.IsValidIndex(ActiveSlotIndex)) return false;
+	if (!Hotbar.IsValidIndex(ActiveSlotIndex))
+	{
+		UE_LOG(LogInventory, Log, TEXT("[Inventory] UseActive: ActiveSlotIndex=%d INVALID"), ActiveSlotIndex);
+		return false;
+	}
 
-	// Get a reference to the active slot for modification.
 	FItemStack& Slot = Hotbar[ActiveSlotIndex];
 
-	// Ensure this slot actually holds an item with a positive count.
-	if (!Slot.isValid()) return false;
+	if (!Slot.isValid())
+	{
+		UE_LOG(LogInventory, Log, TEXT("[Inventory] UseActive: Slot %d is empty"), ActiveSlotIndex);
+		return false;
+	}
 
 	// TODO: trigger item behavior via ItemDef.
-	// For now, we simply consume one unit of the item.
+	UE_LOG(LogInventory, Log, TEXT("[Inventory] UseActive: Using 1x %s from Slot=%d (Before=%d)"),
+		Slot.Item ? *Slot.Item->GetName() : TEXT("NULL"), ActiveSlotIndex, Slot.Count);
+
 	Slot.Count -= 1;
 
-	// If the count reaches zero or below, clear the slot to "empty" state.
 	if (Slot.Count <= 0)
 	{
+		UE_LOG(LogInventory, Log, TEXT("[Inventory] UseActive: Slot %d depleted -> clearing"), ActiveSlotIndex);
 		Slot.Item = nullptr;
 		Slot.Count = 0;
 	}
 
 	return true;
+}
+
+// =============================
+// HasItem / ConsumeItem (debug)
+// =============================
+bool UInventoryComponent::HasItem(const UItemDef* Item, int32 MinCount) const
+{
+	if (!Item || MinCount <= 0)
+	{
+		UE_LOG(LogInventory, Warning, TEXT("[Inventory] HasItem: invalid args (Item=%s, MinCount=%d)"),
+			Item ? *Item->GetName() : TEXT("NULL"), MinCount);
+		return false;
+	}
+
+	int32 Total = 0;
+	for (const FItemStack& Slot : Hotbar)
+	{
+		if (Slot.Item == Item && Slot.Count > 0)
+		{
+			Total += Slot.Count;
+			if (Total >= MinCount)
+			{
+				UE_LOG(LogInventory, Log, TEXT("[Inventory] HasItem(%s) -> Total=%d Needs=%d RETURN=TRUE"),
+					*Item->GetName(), Total, MinCount);
+				return true;
+			}
+		}
+	}
+
+	UE_LOG(LogInventory, Log, TEXT("[Inventory] HasItem(%s) -> Total=%d Needs=%d RETURN=FALSE"),
+		*Item->GetName(), Total, MinCount);
+	return false;
+}
+
+bool UInventoryComponent::ConsumeItem(const UItemDef* Item, int32 Amount)
+{
+	if (!Item || Amount <= 0)
+	{
+		UE_LOG(LogInventory, Warning, TEXT("[Inventory] ConsumeItem: invalid args (Item=%s, Amount=%d)"),
+			Item ? *Item->GetName() : TEXT("NULL"), Amount);
+		return false;
+	}
+
+	int32 Remaining = Amount;
+
+	// Consume from left to right to keep behavior predictable
+	for (FItemStack& Slot : Hotbar)
+	{
+		if (Slot.Item != Item || Slot.Count <= 0) continue;
+
+		const int32 Use = FMath::Min(Slot.Count, Remaining);
+		UE_LOG(LogInventory, Verbose, TEXT("[Inventory] ConsumeItem: Slot pre (Item=%s Count=%d) -> Using %d"),
+			*Item->GetName(), Slot.Count, Use);
+
+		Slot.Count -= Use;
+		Remaining -= Use;
+
+		if (Slot.Count <= 0)
+		{
+			UE_LOG(LogInventory, Verbose, TEXT("[Inventory] ConsumeItem: Slot emptied -> clearing pointer"));
+			Slot.Item = nullptr;
+			Slot.Count = 0;
+		}
+
+		if (Remaining <= 0)
+		{
+			UE_LOG(LogInventory, Log, TEXT("[Inventory] ConsumeItem(%s, %d) -> RETURN=TRUE"),
+				*Item->GetName(), Amount);
+			return true;
+		}
+	}
+
+	UE_LOG(LogInventory, Log, TEXT("[Inventory] ConsumeItem(%s, %d) -> RemainingAfter=%d RETURN=FALSE"),
+		*Item->GetName(), Amount, Remaining);
+	return false; // not enough in total
 }
