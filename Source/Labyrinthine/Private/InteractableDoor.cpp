@@ -1,10 +1,8 @@
 // InteractableDoor.cpp
-// Non-intrusive construction (we don't stomp your transforms), optional frame recenter, hinge auto-offset, key gating, slerp anim.
-
 #include "InteractableDoor.h"
-#include "Components/SceneComponent.h"
 #include "Components/StaticMeshComponent.h"
-#include "Engine/StaticMesh.h"
+#include "Components/SceneComponent.h"
+#include "Engine/Engine.h"
 #include "ItemDef.h"
 #include "InventoryComponent.h"
 
@@ -20,45 +18,44 @@ AInteractableDoor::AInteractableDoor()
 	DoorFrame->SetupAttachment(Root);
 	DoorFrame->SetCollisionProfileName(TEXT("BlockAll"));
 
-	HingePivot = CreateDefaultSubobject<USceneComponent>(TEXT("HingePivot"));
-	HingePivot->SetupAttachment(Root);
-
 	DoorMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("DoorMesh"));
-	DoorMesh->SetupAttachment(HingePivot);
+	DoorMesh->SetupAttachment(Root);
 	DoorMesh->SetCollisionProfileName(TEXT("BlockAll"));
-
-	DoorFrame->SetMobility(EComponentMobility::Static);
 	DoorMesh->SetMobility(EComponentMobility::Movable);
+}
 
+void AInteractableDoor::OnConstruction(const FTransform& Transform)
+{
+	Super::OnConstruction(Transform);
+	// No transform edits here. Designers place DoorFrame and DoorMesh freely.
+}
+
+void AInteractableDoor::BeginPlay()
+{
+	Super::BeginPlay();
 	bUnlocked = bStartUnlocked;
+	ClosedWT = DoorMesh->GetComponentTransform(); // baseline “closed” pose
 }
 
 FText AInteractableDoor::GetPromptText_Implementation() const
 {
-	if (bRequireKey && !bUnlocked)
+	if (!bUnlocked && bRequireKey)
 	{
-		if (RequiredKey)
-		{
-			return FText::Format(
-				NSLOCTEXT("Interact", "DoorLockedFmt", "Locked: {0}"),
-				RequiredKey->DisplayName
-			);
-		}
-		return NSLOCTEXT("Interact", "DoorLocked", "Locked");
+		return RequiredKey
+			? FText::Format(NSLOCTEXT("Interact", "LockedFmt", "Locked: {0}"), RequiredKey->DisplayName)
+			: NSLOCTEXT("Interact", "Locked", "Locked");
 	}
-
-	return NSLOCTEXT("Interact", "DoorOpen", "Open door");
+	return bOpen ? NSLOCTEXT("Interact", "Close", "Close door")
+		: NSLOCTEXT("Interact", "Open", "Open door");
 }
 
 void AInteractableDoor::Interact_Implementation(AActor* Interactor)
 {
-	if (bIsOpening)
-		return;
+	if (bAnimating) return;
 
-	if (bRequireKey && !bUnlocked)
+	if (!bUnlocked && bRequireKey)
 	{
 		bool bHasKey = false;
-
 		if (Interactor)
 		{
 			if (UInventoryComponent* Inv = Interactor->FindComponentByClass<UInventoryComponent>())
@@ -66,14 +63,10 @@ void AInteractableDoor::Interact_Implementation(AActor* Interactor)
 				if (RequiredKey && RequiredKeyCount > 0)
 				{
 					bHasKey = Inv->HasItem(RequiredKey, RequiredKeyCount);
-					if (bHasKey && bConsumeKeyOnOpen)
-					{
-						Inv->ConsumeItem(RequiredKey, RequiredKeyCount);
-					}
+					if (bHasKey && bConsumeKeyOnUnlock) Inv->ConsumeItem(RequiredKey, RequiredKeyCount);
 				}
 			}
 		}
-
 		if (!bHasKey)
 		{
 			if (GEngine)
@@ -85,132 +78,81 @@ void AInteractableDoor::Interact_Implementation(AActor* Interactor)
 			}
 			return;
 		}
-
 		bUnlocked = true;
 	}
 
-	OpenDoor();
-}
-
-void AInteractableDoor::OnConstruction(const FTransform& Transform)
-{
-	Super::OnConstruction(Transform);
-
-	// If any critical component is missing on a placed instance, bail safely.
-	if (!Root || !DoorFrame || !HingePivot || !DoorMesh)
-	{
-		return;
-	}
-
-#if WITH_EDITOR
-	DoorFrame->SetMobility(bFrameIsStatic ? EComponentMobility::Static : EComponentMobility::Movable);
-	DoorMesh->SetMobility(EComponentMobility::Movable);
-#endif
-
-	// Keep lock state synced when editing
-	bUnlocked = bStartUnlocked;
-
-	// IMPORTANT: DO NOT stomp your manual placement.
-	// We won't reset relative transforms anymore.
-	// We only do optional frame recenter if you explicitly enable it:
-	if (bAutoRecenterFrame)
-	{
-		if (UStaticMesh* FrameSM = DoorFrame->GetStaticMesh())
-		{
-			const FBoxSphereBounds FB = FrameSM->GetBounds();   // local-space bounds
-			const FVector Center = FB.Origin;
-			// Recenter around mesh bounds origin (safe; still keeps your existing relative transform)
-			// We do this by setting a new relative location = (current - Center) + FrameOffset.
-			const FVector CurrentRel = DoorFrame->GetRelativeLocation();
-			DoorFrame->SetRelativeLocation(CurrentRel - Center + FrameOffset, false, nullptr, ETeleportType::ResetPhysics);
-		}
-	}
-
-	// Auto hinge offset (leaf only; safe to leave on)
-	bHingeOffsetApplied = false;
-	if (bAutoSetupHinge)
-	{
-		if (UStaticMesh* LeafSM = DoorMesh->GetStaticMesh())
-		{
-			const FBoxSphereBounds LB = LeafSM->GetBounds();
-			const float HalfWidthY = LB.BoxExtent.Y;
-			if (HalfWidthY > KINDA_SMALL_NUMBER)
-			{
-				const float DesiredY = (HingeSide == EDoorHingeSide::Left) ? +HalfWidthY : -HalfWidthY;
-				FVector Rel = DoorMesh->GetRelativeLocation();
-				if (!FMath::IsNearlyEqual(Rel.Y, DesiredY, 0.1f))
-				{
-					Rel.Y = DesiredY;
-					DoorMesh->SetRelativeLocation(Rel, false, nullptr, ETeleportType::ResetPhysics);
-				}
-				bHingeOffsetApplied = true;
-			}
-		}
-	}
-}
-
-void AInteractableDoor::BeginPlay()
-{
-	Super::BeginPlay();
-	bUnlocked = bStartUnlocked;
-
-	// Runtime: hinge offset only (non-intrusive)
-	ApplyHingeOffset();
-}
-
-void AInteractableDoor::ApplyHingeOffset()
-{
-	if (!bAutoSetupHinge || !DoorMesh)
-		return;
-
-	if (UStaticMesh* SM = DoorMesh->GetStaticMesh())
-	{
-		const FBoxSphereBounds LocalBounds = SM->GetBounds();
-		const float HalfWidthY = LocalBounds.BoxExtent.Y;
-		if (HalfWidthY <= KINDA_SMALL_NUMBER)
-			return;
-
-		const float OffsetY = (HingeSide == EDoorHingeSide::Left) ? +HalfWidthY : -HalfWidthY;
-		FVector RelLoc = DoorMesh->GetRelativeLocation();
-		RelLoc.Y = OffsetY;
-		DoorMesh->SetRelativeLocation(RelLoc, false, nullptr, ETeleportType::ResetPhysics);
-	}
+	if (bOpen) CloseDoor(); else OpenDoor();
 }
 
 void AInteractableDoor::OpenDoor()
 {
-	if (!HingePivot)
-		return;
-
-	if (bIsOpening || OpenDurationSeconds <= 0.f)
-		return;
-
-	bIsOpening = true;
-	OpenAlpha = 0.f;
-	PivotStartRot = HingePivot->GetRelativeRotation();
-	PivotTargetRot = PivotStartRot + FRotator(0.f, OpenAngleDegrees, 0.f);
+	if (bAnimating) return;
+	// Re-baseline in case designer moved it in editor while PIE
+	ClosedWT = DoorMesh->GetComponentTransform();
+	bAnimating = true;
+	bOpen = true;
+	Alpha = 0.f;
 	SetActorTickEnabled(true);
+}
+
+void AInteractableDoor::CloseDoor()
+{
+	if (bAnimating) return;
+	bAnimating = true;
+	bOpen = false;
+	Alpha = 1.f;
+	SetActorTickEnabled(true);
+}
+
+static FQuat MakeDeltaQuat(const FVector& AxisW, float AngleDeg)
+{
+	return FQuat(AxisW.GetSafeNormal(), FMath::DegreesToRadians(AngleDeg));
+}
+
+FVector AInteractableDoor::AxisWorld(const FTransform& Ref, EDoorAxis Axis)
+{
+	switch (Axis)
+	{
+	case EDoorAxis::X: return Ref.GetUnitAxis(EAxis::X);
+	case EDoorAxis::Y: return Ref.GetUnitAxis(EAxis::Y);
+	default:           return Ref.GetUnitAxis(EAxis::Z);
+	}
+}
+
+// A=0 => closed; A=1 => fully open
+FTransform AInteractableDoor::MakeDoorWorldAtAlpha(float A) const
+{
+	const FTransform& Base = ClosedWT;
+	const FVector PivotW = Base.TransformPosition(HingeLocal);
+	const FVector AxisW = AxisWorld(Base, HingeAxis);
+	const FQuat   DQ = MakeDeltaQuat(AxisW, OpenAngleDegrees * A);
+
+	const FVector P0 = Base.GetLocation();
+	const FVector Pn = PivotW + DQ.RotateVector(P0 - PivotW);
+	const FQuat   Rn = DQ * Base.GetRotation();
+
+	FTransform Out;
+	Out.SetLocation(Pn);
+	Out.SetRotation(Rn);
+	Out.SetScale3D(Base.GetScale3D());
+	return Out;
 }
 
 void AInteractableDoor::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+	if (!bAnimating) return;
 
-	if (!bIsOpening || !HingePivot)
-		return;
+	const float Speed = 1.f / FMath::Max(0.0001f, OpenDurationSeconds);
+	Alpha += (bOpen ? +1.f : -1.f) * Speed * DeltaSeconds;
+	const float Clamped = FMath::Clamp(Alpha, 0.f, 1.f);
 
-	OpenAlpha += (DeltaSeconds / OpenDurationSeconds);
-	const float T = FMath::Clamp(OpenAlpha, 0.f, 1.f);
+	const FTransform NewWT = MakeDoorWorldAtAlpha(Clamped);
+	DoorMesh->SetWorldTransform(NewWT, false, nullptr, ETeleportType::None);
 
-	const FQuat StartQ = PivotStartRot.Quaternion();
-	const FQuat TargetQ = PivotTargetRot.Quaternion();
-	const FQuat NewQ = FQuat::Slerp(StartQ, TargetQ, T);
-
-	HingePivot->SetRelativeRotation(NewQ);
-
-	if (T >= 1.f)
+	if ((bOpen && Clamped >= 1.f) || (!bOpen && Clamped <= 0.f))
 	{
-		bIsOpening = false;
+		bAnimating = false;
 		SetActorTickEnabled(false);
 	}
 }
