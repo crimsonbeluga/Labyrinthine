@@ -32,6 +32,10 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Flash", meta = (ClampMin = "0.0"))
 	float FlashRadius = 900.f;
 
+	// How long AI stays stunned
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Flash", meta = (ClampMin = "0.0"))
+	float StunDuration = 2.0f;
+
 	// Optional debug draw time for the hitbox
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Debug")
 	float DebugHitboxDrawSeconds = 0.15f;
@@ -47,4 +51,5 @@ private:
 
 	void Detonate();
 	void DoFlashHitbox();
+	void ApplyStun(AActor* A) const;
 };

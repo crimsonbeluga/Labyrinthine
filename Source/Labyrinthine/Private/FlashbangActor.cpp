@@ -5,8 +5,15 @@
 #include "Kismet/KismetSystemLibrary.h"
 #include "DrawDebugHelpers.h"
 #include "Engine/World.h"
-#include "NiagaraFunctionLibrary.h"   // Niagara spawn
+#include "TimerManager.h"
+
+// Niagara
+#include "NiagaraFunctionLibrary.h"
 #include "NiagaraSystem.h"
+
+// AI/Blackboard
+#include "AIController.h"
+#include "BehaviorTree/BlackboardComponent.h"
 
 AFlashbangActor::AFlashbangActor()
 {
@@ -103,6 +110,42 @@ void AFlashbangActor::DoFlashHitbox()
 
 	for (AActor* A : Hits)
 	{
+		ApplyStun(A);
 		UE_LOG(LogTemp, Log, TEXT("[Flashbang] Overlap: %s"), *A->GetName());
+	}
+}
+
+void AFlashbangActor::ApplyStun(AActor* A) const
+{
+	static const FName BB_IsStunned("IsStunned");
+
+	APawn* Pawn = Cast<APawn>(A);
+	if (!Pawn) return;
+
+	AAIController* AIC = Cast<AAIController>(Pawn->GetController());
+	if (!AIC) return;
+
+	UBlackboardComponent* BB = AIC->GetBlackboardComponent();
+	if (!BB) return;
+
+	BB->SetValueAsBool(BB_IsStunned, true);
+
+	// auto-clear after StunDuration
+	if (StunDuration > 0.f)
+	{
+		TWeakObjectPtr<UBlackboardComponent> WeakBB = BB;
+		FTimerHandle ClearHandle;
+		GetWorld()->GetTimerManager().SetTimer(
+			ClearHandle,
+			[WeakBB]()
+			{
+				if (WeakBB.IsValid())
+				{
+					WeakBB->SetValueAsBool(TEXT("IsStunned"), false);
+				}
+			},
+			StunDuration,
+			false
+		);
 	}
 }
