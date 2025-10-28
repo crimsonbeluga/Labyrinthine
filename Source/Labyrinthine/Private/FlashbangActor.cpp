@@ -5,6 +5,8 @@
 #include "Kismet/KismetSystemLibrary.h"
 #include "DrawDebugHelpers.h"
 #include "Engine/World.h"
+#include "NiagaraFunctionLibrary.h"   // Niagara spawn
+#include "NiagaraSystem.h"
 
 AFlashbangActor::AFlashbangActor()
 {
@@ -46,8 +48,18 @@ void AFlashbangActor::Detonate()
 	// FX + SFX
 	if (ExplosionFX)
 	{
-		UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ExplosionFX, GetActorTransform(), true);
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+			GetWorld(),
+			ExplosionFX,
+			GetActorLocation(),
+			GetActorRotation(),
+			FVector(1.f),
+			true,   // auto destroy
+			true,   // auto activate
+			ENCPoolMethod::AutoRelease
+		);
 	}
+
 	if (ExplosionSFX)
 	{
 		UGameplayStatics::PlaySoundAtLocation(this, ExplosionSFX, GetActorLocation());
@@ -63,7 +75,7 @@ void AFlashbangActor::DoFlashHitbox()
 {
 	const FVector Center = GetActorLocation();
 	const TArray<TEnumAsByte<EObjectTypeQuery>> ObjTypes = {
-		UEngineTypes::ConvertToObjectType(ECC_Pawn)  // check pawns only for now
+		UEngineTypes::ConvertToObjectType(ECC_Pawn)  // pawns only
 	};
 	TArray<AActor*> Ignore;
 	if (AActor* Owning = GetOwner()) { Ignore.Add(Owning); }
@@ -89,12 +101,8 @@ void AFlashbangActor::DoFlashHitbox()
 
 	if (!bAny) return;
 
-	// For now we only broadcast presence. Hook your stun logic elsewhere.
 	for (AActor* A : Hits)
 	{
-		// Placeholders:
-		// - Add gameplay tag, call an interface, or set a blackboard value in your AI.
-		// - Example: IFlashAffectable::Execute_OnFlashed(A, Duration);
 		UE_LOG(LogTemp, Log, TEXT("[Flashbang] Overlap: %s"), *A->GetName());
 	}
 }

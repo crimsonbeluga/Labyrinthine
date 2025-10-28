@@ -1,4 +1,3 @@
-// FlashbangActor.h
 #pragma once
 
 #include "CoreMinimal.h"
@@ -7,7 +6,7 @@
 
 class UStaticMeshComponent;
 class USoundBase;
-class UParticleSystem;
+class UNiagaraSystem;
 
 UCLASS()
 class LABYRINTHINE_API AFlashbangActor : public AActor
@@ -21,10 +20,11 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	UStaticMeshComponent* Mesh;
 
-	// Visual and audio on explosion
+	// Niagara VFX on explosion
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FX")
-	UParticleSystem* ExplosionFX = nullptr;
+	UNiagaraSystem* ExplosionFX = nullptr;
 
+	// Audio on explosion
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "FX")
 	USoundBase* ExplosionSFX = nullptr;
 
@@ -45,9 +45,6 @@ protected:
 private:
 	FTimerHandle FuseHandle;
 
-	// Called by timer
 	void Detonate();
-
-	// Utility: overlaps in radius for a single frame and can be extended later
 	void DoFlashHitbox();
 };

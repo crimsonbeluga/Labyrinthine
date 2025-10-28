@@ -8,12 +8,19 @@ public class Labyrinthine : ModuleRules
     {
         PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
-        PublicDependencyModuleNames.AddRange(new string[] {
-            "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput"
+        PublicDependencyModuleNames.AddRange(new string[]
+        {
+            "Core",
+            "CoreUObject",
+            "Engine",
+            "InputCore",
+            "EnhancedInput",
+            "Niagara" // Added for Niagara VFX support
         });
 
         // Add UMG so UWidgetComponent links correctly
-        PrivateDependencyModuleNames.AddRange(new string[] {
+        PrivateDependencyModuleNames.AddRange(new string[]
+        {
             "UMG"
         });
 
