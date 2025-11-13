@@ -289,6 +289,20 @@ void AAMazeCharacter::DealDamage(float DamageAmount)
 	}
 }
 
+void AAMazeCharacter::AddHealth(float AddedHealthAmount)
+{
+	if (currentHealth <= 0) return;
+
+	
+
+	currentHealth += AddedHealthAmount;
+
+	currentHealth = FMath::Clamp(currentHealth, 0.0, 100);
+
+	UE_LOG(LogTemp, Warning, TEXT("Health increased by %f"), AddedHealthAmount);
+
+}
+
 void AAMazeCharacter::HandleDeath()
 {
 	UE_LOG(LogTemp, Warning, TEXT("Death has been called"));

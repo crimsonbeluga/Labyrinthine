@@ -23,6 +23,7 @@ public:
 
 	void DealDamage(float DamageAmount);
 	void HandleDeath();
+	void AddHealth(float AddedHealthAmount);
 
 	UPROPERTY(BlueprintReadOnly, Category = "Health")
 	float currentHealth;
