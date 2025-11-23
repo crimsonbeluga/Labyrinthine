@@ -105,6 +105,10 @@ void AAMazeCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComp
 		{
 			EIC->BindAction(IA_ItemSlot_3, ETriggerEvent::Started, this, &AAMazeCharacter::OnItemSlotThreePressed);
 		}
+		if (IA_Pause)
+		{
+			EIC->BindAction(IA_Pause, ETriggerEvent::Started, this, &AAMazeCharacter::OnPausePressed);
+		}
 	}
 }
 
@@ -184,6 +188,7 @@ void AAMazeCharacter::OnItemSlotThreePressed(const FInputActionValue& /*Value*/)
 {
 	// select slot 3
 }
+
 
 void AAMazeCharacter::SetupDefaultInputMapping()
 {

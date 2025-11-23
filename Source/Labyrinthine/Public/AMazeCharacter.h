@@ -61,6 +61,9 @@ protected:
 	UInputAction* IA_Move;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	UInputAction* IA_Pause;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	UInputAction* IA_Look;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
@@ -103,6 +106,9 @@ protected:
 	void OnItemSlotOnePressed(const FInputActionValue& Value);
 	void OnItemSlotTwoPressed(const FInputActionValue& Value);
 	void OnItemSlotThreePressed(const FInputActionValue& Value);
+
+	UFUNCTION(BlueprintImplementableEvent, Category = "Input")
+	void OnPausePressed(const FInputActionValue& Value);
 
 private:
 	void SetupDefaultInputMapping();
