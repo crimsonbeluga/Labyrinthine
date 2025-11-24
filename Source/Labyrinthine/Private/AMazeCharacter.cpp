@@ -176,17 +176,26 @@ void AAMazeCharacter::OnUsePressed(const FInputActionValue& /*Value*/)
 
 void AAMazeCharacter::OnItemSlotOnePressed(const FInputActionValue& /*Value*/)
 {
-	// select slot 1 if you expose an API
+	 if(Inventory)
+	 {
+		 Inventory->SelectSlot(0);
+	 }
 }
 
 void AAMazeCharacter::OnItemSlotTwoPressed(const FInputActionValue& /*Value*/)
 {
-	// select slot 2
+	if (Inventory)
+	{
+		Inventory->SelectSlot(1);
+	}
 }
 
 void AAMazeCharacter::OnItemSlotThreePressed(const FInputActionValue& /*Value*/)
 {
-	// select slot 3
+	if (Inventory)
+	{
+		Inventory->SelectSlot(2);
+	}
 }
 
 
