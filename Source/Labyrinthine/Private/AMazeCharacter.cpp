@@ -235,6 +235,8 @@ void AAMazeCharacter::UpdateInteractionFocus()
 	TArray<FHitResult> Hits;
 	LastInteractHit = FHitResult();
 
+	bool bFoundInteractable = false; // NEW
+
 	const bool bAny = GetWorld()->SweepMultiByChannel(
 		Hits, Start, End, FQuat::Identity,
 		ECC_GameTraceChannel1,
@@ -242,22 +244,40 @@ void AAMazeCharacter::UpdateInteractionFocus()
 		Params
 	);
 
-	if (bAny)
+	if (bAny) // if the trace hit anything
 	{
-		for (const FHitResult& H : Hits)
+		for (const FHitResult& H : Hits) // for every hit object 
 		{
 			if (!(H.bBlockingHit || H.bStartPenetrating))
 				continue;
 
-			AActor* A = H.GetActor();
+			AActor* A = H.GetActor(); // store the hit object in an actor pointer called A
 			if (!A) continue;
 
 			if (A->GetClass()->ImplementsInterface(UInteractable::StaticClass()))
 			{
+				// creating a prompt of class FText thats gonna store what it says by calling 
+				// the get prompt text function from the specific actor we have hit that implements it
+				const FText Prompt = IInteractable::Execute_GetPromptText(A);
+				// The A in the parenthesis is specifying which object that implements
+				// interactable we are calling this function on
+
+				// NEW: tell Blueprint to show/update the UI prompt
+				ShowInteractionPrompt(Prompt);
+
+				// widget activation function call would go here
 				LastInteractHit = H;
+				bFoundInteractable = true;    // NEW
+
 				break;
 			}
 		}
+	}
+
+	// NEW: if we didn't find any interactable this frame, hide the prompt
+	if (!bFoundInteractable)
+	{
+		HideInteractionPrompt();
 	}
 
 #if WITH_EDITOR
@@ -281,6 +301,7 @@ void AAMazeCharacter::UpdateInteractionFocus()
 	}
 #endif
 }
+
 
 bool AAMazeCharacter::IsWithinInteractRange(const AActor* Target) const
 {

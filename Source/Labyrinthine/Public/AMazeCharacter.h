@@ -25,6 +25,14 @@ public:
 	void HandleDeath();
 	void AddHealth(float AddedHealthAmount);
 
+	// AMazeCharacter.h
+
+UFUNCTION(BlueprintImplementableEvent, Category = "Interaction")
+void ShowInteractionPrompt(const FText& PromptText);
+
+UFUNCTION(BlueprintImplementableEvent, Category = "Interaction")
+void HideInteractionPrompt();
+
 	UPROPERTY(BlueprintReadOnly, Category = "Health")
 	float currentHealth;
 
@@ -94,6 +102,7 @@ protected:
 	UInventoryComponent* Inventory = nullptr;
 
 	void UpdateInteractionFocus();
+
 	bool IsWithinInteractRange(const AActor* Target) const;
 
 	// Input callbacks
