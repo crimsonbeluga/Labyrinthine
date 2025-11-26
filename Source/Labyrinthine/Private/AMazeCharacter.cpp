@@ -3,6 +3,8 @@
 #include "Camera/CameraComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "TimerManager.h"
+
 
 // Enhanced Input
 #include "EnhancedInputSubsystems.h"
@@ -109,6 +111,14 @@ void AAMazeCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComp
 		{
 			EIC->BindAction(IA_Pause, ETriggerEvent::Started, this, &AAMazeCharacter::OnPausePressed);
 		}
+		if (IA_Sprint)
+		{
+			EIC->BindAction(IA_Sprint, ETriggerEvent::Started, this, &AAMazeCharacter::SetSprintSpeed);
+			EIC->BindAction(IA_Sprint, ETriggerEvent::Completed, this, &AAMazeCharacter::SetWalkSpeed);
+		}
+
+
+
 	}
 }
 
@@ -146,6 +156,8 @@ void AAMazeCharacter::OnJumpReleased(const FInputActionValue& /*Value*/)
 
 void AAMazeCharacter::OnInteractPressed(const FInputActionValue& /*Value*/)
 {
+	Inventory->OnInventoryChanged.Broadcast();
+
 	AActor* Target = LastInteractHit.GetActor();
 
 	if (!Target)
@@ -171,19 +183,24 @@ void AAMazeCharacter::OnInteractPressed(const FInputActionValue& /*Value*/)
 
 void AAMazeCharacter::OnUsePressed(const FInputActionValue& /*Value*/)
 {
+	Inventory->OnInventoryChanged.Broadcast();
+
 	if (Inventory) { Inventory->UseActive(this); }
 }
 
 void AAMazeCharacter::OnItemSlotOnePressed(const FInputActionValue& /*Value*/)
 {
+
 	 if(Inventory)
 	 {
 		 Inventory->SelectSlot(0);
+
 	 }
 }
 
 void AAMazeCharacter::OnItemSlotTwoPressed(const FInputActionValue& /*Value*/)
 {
+
 	if (Inventory)
 	{
 		Inventory->SelectSlot(1);
@@ -192,6 +209,7 @@ void AAMazeCharacter::OnItemSlotTwoPressed(const FInputActionValue& /*Value*/)
 
 void AAMazeCharacter::OnItemSlotThreePressed(const FInputActionValue& /*Value*/)
 {
+
 	if (Inventory)
 	{
 		Inventory->SelectSlot(2);
@@ -220,7 +238,7 @@ void AAMazeCharacter::UpdateInteractionFocus()
 {
 	if (!Camera) return;
 
-	const float StartOffset = 200.f;
+	const float StartOffset = 0.f;
 	const float Distance = InteractTraceDistance;
 	const float Radius = InteractTraceRadius;
 
@@ -346,4 +364,67 @@ void AAMazeCharacter::HandleDeath()
 void AAMazeCharacter::TryUseSelectedItem()
 {
 	if (Inventory) { Inventory->UseActive(this); }
+}
+
+
+void AAMazeCharacter::SetSprintSpeed()
+{
+	if (!bCanSprint) return;
+	bIsWalking = false;
+
+	GetWorld()->GetTimerManager().SetTimer(
+		sprintTimerHandle,
+		this,
+		&AAMazeCharacter::SetWalkSpeed, // <- ampersand is required
+		sprintTime,
+		false
+	);
+
+	GetCharacterMovement()->MaxWalkSpeed = sprintSpeed;
+
+	
+}
+
+
+void AAMazeCharacter::SetWalkSpeed()
+{
+	if (bIsWalking)
+	{
+		return;
+	}
+
+	DisableSprintiing();
+	SprintRecoveryTimeMath();
+	GetCharacterMovement()->MaxWalkSpeed = walkSpeed;
+	bIsWalking = true;
+
+}
+
+void AAMazeCharacter::DisableSprintiing()
+{
+	bCanSprint = false;
+	
+}
+
+void AAMazeCharacter::EnableSprint()
+{
+	bCanSprint = true;
+	
+
+}
+
+void AAMazeCharacter::SprintRecoveryTimeMath()
+{
+	timeSprinted = GetWorld()->GetTimerManager().GetTimerElapsed(sprintTimerHandle);
+
+
+
+	GetWorld()->GetTimerManager().SetTimer(
+		sprintRecoveryTimerHandle,
+		this,
+		&AAMazeCharacter::EnableSprint, // <- ampersand is required
+		timeSprinted,
+		false
+	);
+
 }

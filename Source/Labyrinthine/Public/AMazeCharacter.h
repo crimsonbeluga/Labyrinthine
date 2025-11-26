@@ -4,6 +4,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "InputActionValue.h"
+#include "TimerManager.h"
 #include "AMazeCharacter.generated.h"
 
 class UCameraComponent;
@@ -27,11 +28,33 @@ public:
 
 	// AMazeCharacter.h
 
+	UFUNCTION( Category = "Walking")
+	void SetWalkSpeed();
+
+	UFUNCTION( Category = "Running")
+	void SetSprintSpeed();
+
 UFUNCTION(BlueprintImplementableEvent, Category = "Interaction")
 void ShowInteractionPrompt(const FText& PromptText);
 
 UFUNCTION(BlueprintImplementableEvent, Category = "Interaction")
 void HideInteractionPrompt();
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Running")
+	float sprintTime = 5.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Running")
+	float sprintRecoveryTime;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Running")
+	float sprintSpeed = 900.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Running")
+	float timeSprinted;
+
+	UPROPERTY(BlueprintReadWrite, Category = "Walking")
+	float walkSpeed = 600.f;
+
 
 	UPROPERTY(BlueprintReadOnly, Category = "Health")
 	float currentHealth;
@@ -92,6 +115,15 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	UInputAction* IA_Use;
 
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	UInputAction* IA_Sprint;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Running", meta = (AllowPrivateAccess = "true"))
+	FTimerHandle sprintTimerHandle;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Running", meta = (AllowPrivateAccess = "true"))
+	FTimerHandle sprintRecoveryTimerHandle;
+
 	UPROPERTY(VisibleAnywhere, Category = "Interaction")
 	USphereComponent* InteractRange = nullptr;
 
@@ -101,9 +133,17 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
 	UInventoryComponent* Inventory = nullptr;
 
+
 	void UpdateInteractionFocus();
 
 	bool IsWithinInteractRange(const AActor* Target) const;
+
+	UPROPERTY(BlueprintReadOnly)
+	bool bCanSprint = true;
+
+	UPROPERTY(BlueprintReadOnly)
+	bool bIsWalking = true;
+
 
 	// Input callbacks
 	void HandleMove(const FInputActionValue& Value);
@@ -115,6 +155,9 @@ protected:
 	void OnItemSlotOnePressed(const FInputActionValue& Value);
 	void OnItemSlotTwoPressed(const FInputActionValue& Value);
 	void OnItemSlotThreePressed(const FInputActionValue& Value);
+	void DisableSprintiing();
+	void EnableSprint();
+	void SprintRecoveryTimeMath();
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "Input")
 	void OnPausePressed(const FInputActionValue& Value);

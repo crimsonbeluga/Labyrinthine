@@ -39,10 +39,12 @@ UInventoryComponent::UInventoryComponent()
 // If no such slot exists, returns INDEX_NONE (-1).
 int32 UInventoryComponent::FindSlotWithItem(UItemDef* Item) const
 {
+
 	if (!Item)
 	{
 		UE_LOG(LogInventory, Warning, TEXT("[Inventory] FindSlotWithItem(NULL) -> INDEX_NONE"));
 		return INDEX_NONE;
+		
 	}
 
 	for (int32 i = 0; i < Hotbar.Num(); ++i)
@@ -66,15 +68,18 @@ int32 UInventoryComponent::FindSlotWithItem(UItemDef* Item) const
 // Returns the first index that qualifies, or INDEX_NONE if none are empty.
 int32 UInventoryComponent::FindFirstEmptySlot() const
 {
+
 	for (int32 i = 0; i < Hotbar.Num(); ++i)
 	{
 		if (!Hotbar[i].Item || Hotbar[i].Count <= 0)
 		{
 			UE_LOG(LogInventory, Verbose, TEXT("[Inventory] FindFirstEmptySlot -> %d"), i);
 			return i;
+			
 		}
 	}
 	UE_LOG(LogInventory, Verbose, TEXT("[Inventory] FindFirstEmptySlot -> INDEX_NONE"));
+
 	return INDEX_NONE;
 }
 
@@ -83,6 +88,7 @@ int32 UInventoryComponent::FindFirstEmptySlot() const
 // ===========================================================
 bool UInventoryComponent::HasThreeUniqueTypes() const
 {
+
 	TSet<UItemDef*> Unique;
 
 	for (const FItemStack& S : Hotbar)
@@ -129,8 +135,6 @@ bool UInventoryComponent::AddItem(UItemDef* Item, int32 Count)
 
 		const int32 ToAdd = FMath::Min(Count, FreeSpace);
 		Hotbar[Slot].Count += ToAdd;
-		UE_LOG(LogInventory, Log, TEXT("[Inventory] AddItem: Stacked %d into Slot=%d (Now=%d/%d)"),
-			ToAdd, Slot, Hotbar[Slot].Count, MaxStack);
 
 		int32 Remainder = Count - ToAdd;
 
@@ -148,7 +152,8 @@ bool UInventoryComponent::AddItem(UItemDef* Item, int32 Count)
 				Chunk, *Item->GetName(), Empty, Remainder);
 		}
 
-		UE_LOG(LogInventory, Log, TEXT("[Inventory] AddItem(%s) END -> TRUE"), *Item->GetName());
+		UE_LOG(LogInventory, Log, TEXT("[Inventory] AddItem(%s) END -> TRUE (stacked)"), *Item->GetName());
+		OnInventoryChanged.Broadcast();                    // ? broadcast AFTER all changes
 		return true;
 	}
 
@@ -163,7 +168,7 @@ bool UInventoryComponent::AddItem(UItemDef* Item, int32 Count)
 	if (Empty == INDEX_NONE)
 	{
 		UE_LOG(LogInventory, Log, TEXT("[Inventory] AddItem: No empty slots -> FALSE"));
-		return false;
+		return false;                                      // ? now correctly inside the if
 	}
 
 	const int32 MaxStack = FMath::Max(1, Item->MaxStack);
@@ -171,6 +176,7 @@ bool UInventoryComponent::AddItem(UItemDef* Item, int32 Count)
 
 	Hotbar[Empty].Item = Item;
 	Hotbar[Empty].Count = ToAdd;
+
 	UE_LOG(LogInventory, Log, TEXT("[Inventory] AddItem: Seeded new stack in Slot=%d Count=%d/%d"),
 		Empty, ToAdd, MaxStack);
 
@@ -184,7 +190,7 @@ bool UInventoryComponent::AddItem(UItemDef* Item, int32 Count)
 	int32 Remainder = Count - ToAdd;
 	while (Remainder > 0)
 	{
-		int32 NextEmpty = FindFirstEmptySlot();
+		const int32 NextEmpty = FindFirstEmptySlot();
 		if (NextEmpty == INDEX_NONE) break;
 
 		const int32 Chunk = FMath::Min(Remainder, MaxStack);
@@ -196,26 +202,35 @@ bool UInventoryComponent::AddItem(UItemDef* Item, int32 Count)
 			Chunk, *Item->GetName(), NextEmpty, Remainder);
 	}
 
-	UE_LOG(LogInventory, Log, TEXT("[Inventory] AddItem(%s) END -> TRUE"), *Item->GetName());
+	UE_LOG(LogInventory, Log, TEXT("[Inventory] AddItem(%s) END -> TRUE (new stack)"), *Item->GetName());
+	OnInventoryChanged.Broadcast();                        // ? and also here
 	return true;
 }
+
 
 // ==========================================
 // SelectSlot: change the active hotbar index
 // ==========================================
 void UInventoryComponent::SelectSlot(int32 Index)
 {
-	if (Hotbar.IsValidIndex(Index))
-	{
-		UE_LOG(LogInventory, Log, TEXT("[Inventory] SelectSlot(%d) (Prev=%d)"), Index, ActiveSlotIndex);
-		ActiveSlotIndex = Index;
-	}
-	else
+	if (!Hotbar.IsValidIndex(Index))
 	{
 		UE_LOG(LogInventory, Warning, TEXT("[Inventory] SelectSlot(%d) OUT OF RANGE (HotbarSize=%d)"),
 			Index, Hotbar.Num());
+		return;
 	}
+
+	if (ActiveSlotIndex == Index)
+	{
+		return; // no change, no broadcast needed
+	}
+
+	UE_LOG(LogInventory, Log, TEXT("[Inventory] SelectSlot(%d) (Prev=%d)"), Index, ActiveSlotIndex);
+	ActiveSlotIndex = Index;
+
+	OnInventoryChanged.Broadcast();
 }
+
 
 // =====================================
 // UseActive: consume/use the active item
@@ -224,24 +239,15 @@ void UInventoryComponent::SelectSlot(int32 Index)
 bool UInventoryComponent::UseActive(AActor* User)
 {
 	if (!Hotbar.IsValidIndex(ActiveSlotIndex))
-	{
-		UE_LOG(LogInventory, Log, TEXT("[Inventory] UseActive: ActiveSlotIndex=%d INVALID"), ActiveSlotIndex);
 		return false;
-	}
 
 	FItemStack& Slot = Hotbar[ActiveSlotIndex];
 	if (!Slot.isValid())
-	{
-		UE_LOG(LogInventory, Log, TEXT("[Inventory] UseActive: Slot %d is empty"), ActiveSlotIndex);
 		return false;
-	}
 
 	UItemDef* Def = Slot.Item;
 	if (!Def)
-	{
-		UE_LOG(LogInventory, Warning, TEXT("[Inventory] UseActive: Slot %d has null ItemDef"), ActiveSlotIndex);
 		return false;
-	}
 
 	bool bUsedOK = false;
 
@@ -250,27 +256,28 @@ bool UInventoryComponent::UseActive(AActor* User)
 		AAMazeCharacter* AsChar = Cast<AAMazeCharacter>(User ? User : GetOwner());
 		bUsedOK = Def->UseBehavior->Use(AsChar, Def);
 	}
-	else
-	{
-		UE_LOG(LogInventory, Warning, TEXT("[Inventory] UseActive: %s has no UseBehavior; not consuming"), *Def->GetName());
-	}
+
+	bool bInventoryChanged = false;
 
 	if (bUsedOK && Def->bConsumable)
 	{
-		UE_LOG(LogInventory, Log, TEXT("[Inventory] UseActive: Consuming 1x %s from Slot=%d (Before=%d)"),
-			*Def->GetName(), ActiveSlotIndex, Slot.Count);
-
 		Slot.Count -= 1;
 		if (Slot.Count <= 0)
 		{
-			UE_LOG(LogInventory, Log, TEXT("[Inventory] UseActive: Slot %d depleted -> clearing"), ActiveSlotIndex);
 			Slot.Item = nullptr;
 			Slot.Count = 0;
 		}
+		bInventoryChanged = true;
+	}
+
+	if (bInventoryChanged)
+	{
+		OnInventoryChanged.Broadcast();
 	}
 
 	return bUsedOK;
 }
+
 
 
 // =============================
@@ -278,6 +285,7 @@ bool UInventoryComponent::UseActive(AActor* User)
 // =============================
 bool UInventoryComponent::HasItem(const UItemDef* Item, int32 MinCount) const
 {
+
 	if (!Item || MinCount <= 0)
 	{
 		UE_LOG(LogInventory, Warning, TEXT("[Inventory] HasItem: invalid args (Item=%s, MinCount=%d)"),
@@ -296,6 +304,7 @@ bool UInventoryComponent::HasItem(const UItemDef* Item, int32 MinCount) const
 				UE_LOG(LogInventory, Log, TEXT("[Inventory] HasItem(%s) -> Total=%d Needs=%d RETURN=TRUE"),
 					*Item->GetName(), Total, MinCount);
 				return true;
+				
 			}
 		}
 	}
@@ -303,47 +312,41 @@ bool UInventoryComponent::HasItem(const UItemDef* Item, int32 MinCount) const
 	UE_LOG(LogInventory, Log, TEXT("[Inventory] HasItem(%s) -> Total=%d Needs=%d RETURN=FALSE"),
 		*Item->GetName(), Total, MinCount);
 	return false;
+	
 }
 
 bool UInventoryComponent::ConsumeItem(const UItemDef* Item, int32 Amount)
 {
 	if (!Item || Amount <= 0)
-	{
-		UE_LOG(LogInventory, Warning, TEXT("[Inventory] ConsumeItem: invalid args (Item=%s, Amount=%d)"),
-			Item ? *Item->GetName() : TEXT("NULL"), Amount);
 		return false;
-	}
 
 	int32 Remaining = Amount;
+	bool  bChanged = false;
 
-	// Consume from left to right to keep behavior predictable
 	for (FItemStack& Slot : Hotbar)
 	{
 		if (Slot.Item != Item || Slot.Count <= 0) continue;
 
 		const int32 Use = FMath::Min(Slot.Count, Remaining);
-		UE_LOG(LogInventory, Verbose, TEXT("[Inventory] ConsumeItem: Slot pre (Item=%s Count=%d) -> Using %d"),
-			*Item->GetName(), Slot.Count, Use);
-
 		Slot.Count -= Use;
 		Remaining -= Use;
+		bChanged = true;
 
 		if (Slot.Count <= 0)
 		{
-			UE_LOG(LogInventory, Verbose, TEXT("[Inventory] ConsumeItem: Slot emptied -> clearing pointer"));
 			Slot.Item = nullptr;
 			Slot.Count = 0;
 		}
 
 		if (Remaining <= 0)
 		{
-			UE_LOG(LogInventory, Log, TEXT("[Inventory] ConsumeItem(%s, %d) -> RETURN=TRUE"),
-				*Item->GetName(), Amount);
+			if (bChanged)
+			{
+				OnInventoryChanged.Broadcast();
+			}
 			return true;
 		}
 	}
 
-	UE_LOG(LogInventory, Log, TEXT("[Inventory] ConsumeItem(%s, %d) -> RemainingAfter=%d RETURN=FALSE"),
-		*Item->GetName(), Amount, Remaining);
 	return false; // not enough in total
 }

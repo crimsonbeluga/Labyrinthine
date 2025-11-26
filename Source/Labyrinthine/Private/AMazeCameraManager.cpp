@@ -4,6 +4,6 @@
 AAMazeCameraManager::AAMazeCameraManager()
 {
     // Negative = look UP, Positive = look DOWN
-    ViewPitchMin = -50.f;
+    ViewPitchMin = -90.f;
     ViewPitchMax = 90.f;
 }

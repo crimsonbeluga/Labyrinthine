@@ -34,6 +34,8 @@ struct FItemStack
 	bool isValid() const { return Item != nullptr && Count > 0; }
 };
 
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnInventoryChanged);
 // ==================================
 // UInventoryComponent: the hotbar API
 // ==================================
@@ -74,6 +76,10 @@ public:
 	// NOTE: This is a stub for now; in a complete system, this would trigger item behavior via UItemDef.
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
 	bool UseActive(AActor* User);
+	// Event you can bind to in Blueprints (e.g. UI widget binds and calls RefreshInventory)
+	UPROPERTY(BlueprintAssignable, Category = "Inventory")
+	FOnInventoryChanged OnInventoryChanged;
+
 
 	// ======================
 	// Data (Editable/Visible)
