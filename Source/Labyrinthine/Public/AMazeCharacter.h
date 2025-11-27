@@ -118,6 +118,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Input")
 	UInputAction* IA_Sprint;
 
+	UPROPERTY(EditDefaultsOnly, Category = "Input")
+	UInputAction* IA_Crouch;
+
 	UPROPERTY(BlueprintReadOnly, Category = "Running", meta = (AllowPrivateAccess = "true"))
 	FTimerHandle sprintTimerHandle;
 
@@ -158,6 +161,8 @@ protected:
 	void DisableSprintiing();
 	void EnableSprint();
 	void SprintRecoveryTimeMath();
+	void OnCrouchPressed();
+	void OnCrouchReleased();
 
 	UFUNCTION(BlueprintImplementableEvent, Category = "Input")
 	void OnPausePressed(const FInputActionValue& Value);

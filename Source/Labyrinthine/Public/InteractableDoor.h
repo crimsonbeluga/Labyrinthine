@@ -8,6 +8,7 @@
 class UStaticMeshComponent;
 class UItemDef;
 class UInventoryComponent;
+class UAudioComponent;
 
 UENUM(BlueprintType)
 enum class EDoorAxis : uint8 { X, Y, Z };
@@ -75,6 +76,13 @@ private:
 
 	UPROPERTY(EditAnywhere, Category = "Door|Key")
 	bool bStartUnlocked = false;
+
+
+	UPROPERTY(EditAnywhere, Category = "Door")
+	USoundBase* OpenDoorSound;
+
+	UPROPERTY(EditAnywhere, Category ="Door")
+	USoundBase* CloseDoorSound;
 
 	// Runtime
 	bool  bUnlocked = false;

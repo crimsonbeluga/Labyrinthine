@@ -116,6 +116,11 @@ void AAMazeCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComp
 			EIC->BindAction(IA_Sprint, ETriggerEvent::Started, this, &AAMazeCharacter::SetSprintSpeed);
 			EIC->BindAction(IA_Sprint, ETriggerEvent::Completed, this, &AAMazeCharacter::SetWalkSpeed);
 		}
+		if (IA_Crouch)
+		{
+			EIC->BindAction(IA_Crouch, ETriggerEvent::Started, this, &AAMazeCharacter::OnCrouchPressed);
+			EIC->BindAction(IA_Crouch, ETriggerEvent::Completed, this, &AAMazeCharacter::OnCrouchReleased);
+		}
 
 
 
@@ -427,4 +432,18 @@ void AAMazeCharacter::SprintRecoveryTimeMath()
 		false
 	);
 
+}
+
+void AAMazeCharacter::OnCrouchPressed()
+{
+	Crouch();
+	UE_LOG(LogTemp, Warning, TEXT("crouched"));
+}
+
+
+void AAMazeCharacter::OnCrouchReleased()
+{
+	UnCrouch();
+
+	UE_LOG(LogTemp,Warning, TEXT("uncrouched"));
 }

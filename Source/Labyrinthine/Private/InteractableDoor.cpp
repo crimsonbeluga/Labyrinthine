@@ -5,6 +5,8 @@
 #include "Engine/Engine.h"
 #include "ItemDef.h"
 #include "InventoryComponent.h"
+#include "Kismet/GameplayStatics.h"
+#include "Components/AudioComponent.h"
 
 AInteractableDoor::AInteractableDoor()
 {
@@ -93,6 +95,8 @@ void AInteractableDoor::OpenDoor()
 	bOpen = true;
 	Alpha = 0.f;
 	SetActorTickEnabled(true);
+	UGameplayStatics::PlaySoundAtLocation(this, OpenDoorSound, GetActorLocation());
+
 }
 
 void AInteractableDoor::CloseDoor()
@@ -102,6 +106,7 @@ void AInteractableDoor::CloseDoor()
 	bOpen = false;
 	Alpha = 1.f;
 	SetActorTickEnabled(true);
+	UGameplayStatics::PlaySoundAtLocation(this, CloseDoorSound, GetActorLocation());
 }
 
 static FQuat MakeDeltaQuat(const FVector& AxisW, float AngleDeg)
