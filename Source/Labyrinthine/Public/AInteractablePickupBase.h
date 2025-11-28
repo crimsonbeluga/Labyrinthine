@@ -9,6 +9,7 @@
 class UStaticMeshComponent;
 class UWidgetComponent;
 class UItemDef;
+class USoundBase;
 
 // This actor represents a physical item pickup in the world that can be interacted with by the player.
 // It implements the IInteractable interface so that the player can look at it, see a prompt, and pick it up.
@@ -40,6 +41,9 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	USceneComponent* InteractTarget;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Sound")
+	USoundBase* InteractSound;
 
 
 public:

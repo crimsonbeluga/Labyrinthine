@@ -3,6 +3,7 @@
 #include "Components/WidgetComponent.h"
 #include "InventoryComponent.h"
 #include "ItemDef.h"
+#include "Kismet/GameplayStatics.h"
 
 AAInteractablePickupBase::AAInteractablePickupBase()
 {
@@ -67,6 +68,8 @@ void AAInteractablePickupBase::Interact_Implementation(AActor* Interactor)
 	{
 		if (Inv->AddItem(ItemData, Quantity)) // if we can find an inventory component then add the item by passing in what type of object and how mmuch of it
 		{
+
+			UGameplayStatics::PlaySoundAtLocation(this, InteractSound, GetActorLocation());
 			SetActorEnableCollision(false);
 			SetActorHiddenInGame(true);
 			Destroy();
