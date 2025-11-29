@@ -79,6 +79,11 @@ protected:
 	virtual void Tick(float DeltaTime) override;
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
+
+
+	UFUNCTION(BlueprintImplementableEvent)
+	void PlayJumpSound();
+
 	UPROPERTY(VisibleAnywhere, Category = "Components")
 	USpringArmComponent* SpringArm;
 

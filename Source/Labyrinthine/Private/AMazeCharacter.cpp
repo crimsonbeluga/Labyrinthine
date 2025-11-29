@@ -32,16 +32,16 @@ AAMazeCharacter::AAMazeCharacter()
 	SpringArm = CreateDefaultSubobject<USpringArmComponent>(TEXT("Spring Arm"));
 	SpringArm->SetupAttachment(RootComponent);
 	SpringArm->TargetArmLength = 300.f;
-	SpringArm->bUsePawnControlRotation = true;
+	SpringArm->bUsePawnControlRotation = true; 
 
 	Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
 	Camera->SetupAttachment(SpringArm);
 	Camera->bUsePawnControlRotation = false;
 
 	// Movement
-	bUseControllerRotationYaw = false;
-	GetCharacterMovement()->bOrientRotationToMovement = true;
-	GetCharacterMovement()->RotationRate = FRotator(0.f, 540.f, 0.f);
+	bUseControllerRotationYaw = true ; // here
+	GetCharacterMovement()->bOrientRotationToMovement = false; // here
+	GetCharacterMovement()->RotationRate = FRotator(0.f, 540.f, 0.f); 
 
 	// Interaction
 	InteractRange = CreateDefaultSubobject<USphereComponent>(TEXT("Interact Range"));
@@ -84,7 +84,7 @@ void AAMazeCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComp
 		}
 		if (IA_Jump)
 		{
-			EIC->BindAction(IA_Jump, ETriggerEvent::Triggered, this, &AAMazeCharacter::OnJumpPressed);
+			EIC->BindAction(IA_Jump, ETriggerEvent::Started, this, &AAMazeCharacter::OnJumpPressed);
 			EIC->BindAction(IA_Jump, ETriggerEvent::Completed, this, &AAMazeCharacter::OnJumpReleased);
 		}
 		if (IA_Interact)
@@ -152,12 +152,15 @@ void AAMazeCharacter::HandleLook(const FInputActionValue& Value)
 void AAMazeCharacter::OnJumpPressed(const FInputActionValue& /*Value*/)
 {
 	Jump();
+	PlayJumpSound();
+
 }
 
 void AAMazeCharacter::OnJumpReleased(const FInputActionValue& /*Value*/)
 {
 	StopJumping();
 }
+
 
 void AAMazeCharacter::OnInteractPressed(const FInputActionValue& /*Value*/)
 {
