@@ -14,6 +14,27 @@ class UInputAction;
 class USphereComponent;
 class UInventoryComponent;
 
+//this a delegate that fires whenever this characters health changes
+// it will pass new health and max health to any listeners
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnHealthChanged, float, NewHealth, float, MaxHealth);
+// DECLARE -> This macro defines a new delegate *type* so it can be used elsewhere (like a function signature for events)
+
+// DYNAMIC -> Makes the delegate visible to Unreal’s reflection system, allowing Blueprint binding and runtime binding
+
+// MULTICAST -> Allows multiple listeners to subscribe to this event (UI, audio manager, gameplay systems, etc.)
+
+// TwoParams -> Specifies that this delegate takes exactly two parameters in its signature
+
+// Declares a Blueprint-visible multicast event type that takes exactly two parameters
+// Name of the delegate type being defined
+// Type of the first parameter
+// Name of the first parameter (current health after damage/heal)
+// Type of the second parameter
+// Name of the second parameter (maximum health value)
+
+
+
+
 UCLASS()
 class LABYRINTHINE_API AAMazeCharacter : public ACharacter
 {
@@ -61,6 +82,22 @@ void HideInteractionPrompt();
 
 	UPROPERTY(BlueprintReadOnly, Category = "Health")
 	float startingHealth = 100;
+
+	UPROPERTY(BlueprintAssignable, Category = "Health")
+	FOnHealthChanged OnHealthChanged;
+// FOnHealthChanged → The *delegate type* (created earlier with DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams).
+// OnHealthChanged → The *instance* of that delegate type stored on this character.
+//                    This instance holds all bound listeners and is what you call Broadcast() on.
+
+	UFUNCTION(BlueprintPure, Category = "Health")
+	float GetHealthPercent() const
+	{
+		return (startingHealth > 0.0f) ? currentHealth / startingHealth : 0.0f;
+
+	}
+	// a function that will return the percent the health bar should be at this does not alter the health bar just gets the value that will be used to alter it
+
+
 
 	UPROPERTY(EditAnywhere, Category = "Interaction|Trace", meta = (ClampMin = "50", ClampMax = "5000"))
 	float InteractTraceDistance = 500.f;

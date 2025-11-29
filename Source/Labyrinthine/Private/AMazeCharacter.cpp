@@ -59,6 +59,8 @@ void AAMazeCharacter::BeginPlay()
 	Super::BeginPlay();
 	SetupDefaultInputMapping();
 	currentHealth = startingHealth;
+	OnHealthChanged.Broadcast(currentHealth, startingHealth);
+	// at the start of the game we need to tell the Widget what heeakth were at this line will do that 
 }
 
 void AAMazeCharacter::Tick(float DeltaTime)
@@ -344,6 +346,9 @@ void AAMazeCharacter::DealDamage(float DamageAmount)
 	currentHealth -= DamageAmount;
 
 	UE_LOG(LogTemp, Warning, TEXT("Damage has been done"));
+
+	OnHealthChanged.Broadcast(currentHealth, startingHealth);
+
 	if (currentHealth <= 0)
 	{
 		HandleDeath();
@@ -361,6 +366,8 @@ void AAMazeCharacter::AddHealth(float AddedHealthAmount)
 	currentHealth = FMath::Clamp(currentHealth, 0.0, 100);
 
 	UE_LOG(LogTemp, Warning, TEXT("Health increased by %f"), AddedHealthAmount);
+
+	OnHealthChanged.Broadcast(currentHealth, startingHealth);
 
 }
 
