@@ -308,26 +308,7 @@ void AAMazeCharacter::UpdateInteractionFocus()
 		HideInteractionPrompt();
 	}
 
-#if WITH_EDITOR
-	const FVector Path = End - Start;
-	const float PathLen = Path.Size();
-	const FVector Mid = Start + Path * 0.5f;
-	const FQuat Rot = FRotationMatrix::MakeFromZ(Path.GetSafeNormal()).ToQuat();
 
-	DrawDebugCapsule(GetWorld(), Mid, PathLen * 0.5f, Radius, Rot,
-		FColor(80, 80, 80), false, 0.f, 0, 1.25f);
-
-	for (const FHitResult& H : Hits)
-	{
-		if (H.bBlockingHit || H.bStartPenetrating)
-		{
-			DrawDebugSphere(GetWorld(), H.ImpactPoint, 6.f, 12,
-				(AActor*)H.GetActor() == (AActor*)LastInteractHit.GetActor() ?
-				FColor::Green : FColor::Yellow,
-				false, 0.f, 0, 1.25f);
-		}
-	}
-#endif
 }
 
 
