@@ -28,6 +28,9 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Flashbang|Audio")
 	USoundBase* DropSFX = nullptr;
 
+	UPROPERTY()
+	AFlashbangActor* LastSpawnedFlashbang;
+
 	// NOTE: override the _Implementation form
 	virtual bool Use_Implementation(AAMazeCharacter* User, UItemDef* ItemDef) override;
 };

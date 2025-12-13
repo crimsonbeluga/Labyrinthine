@@ -16,6 +16,9 @@ class LABYRINTHINE_API AFlashbangActor : public AActor
 public:
 	AFlashbangActor();
 
+
+	UFUNCTION(BlueprintImplementableEvent)
+	void CreateNoiseEvent();
 	// Mesh with physics enabled
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	UStaticMeshComponent* Mesh;
@@ -40,15 +43,29 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Debug")
 	float DebugHitboxDrawSeconds = 0.15f;
 
+	UPROPERTY(EditDefaultsOnly, Category = "Throw")
+	float SpinStrength = 150.f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Throw")
+	float ThrowStrength = 1200.f;
+
+	// Upward arc component
+	UPROPERTY(EditDefaultsOnly, Category = "Throw")
+	float ArcBoost = 300.f;
+
 	// Arm the grenade. Starts fuse timer.
 	void Arm(float FuseSeconds, AActor* NewInstigator);
 
+	UStaticMeshComponent* GetMesh() const { return Mesh; }
+
+
+	void Throw(const FVector& LinearImpulse);
 protected:
 	virtual void BeginPlay() override;
 
 private:
 	FTimerHandle FuseHandle;
-
+	
 	void Detonate();
 	void DoFlashHitbox();
 	void ApplyStun(AActor* A) const;

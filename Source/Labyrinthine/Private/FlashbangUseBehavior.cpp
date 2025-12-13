@@ -24,10 +24,21 @@ bool UFlashbangUseBehavior::Use_Implementation(AAMazeCharacter* User, UItemDef* 
 	AFlashbangActor* fb = User->GetWorld()->SpawnActor<AFlashbangActor>(FlashbangClass, spawnLoc, spawnRot, p);
 	if (!fb) return false;
 
+
+
+	
+
+
 	if (DropSFX)
 	{
 		UGameplayStatics::PlaySoundAtLocation(User, DropSFX, spawnLoc);
 	}
+
+	FRotator ControlRot = User->GetControlRotation();
+	FVector ThrowDir = ControlRot.Vector();
+	
+
+	fb->Throw(ThrowDir);
 
 	fb->Arm(FuseSeconds, User);
 	return true;

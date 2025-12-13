@@ -52,6 +52,8 @@ void AFlashbangActor::Arm(float FuseSeconds, AActor* NewInstigator)
 
 void AFlashbangActor::Detonate()
 {
+	
+
 	// FX + SFX
 	if (ExplosionFX)
 	{
@@ -77,6 +79,37 @@ void AFlashbangActor::Detonate()
 
 	Destroy();
 }
+
+void AFlashbangActor::Throw(const FVector& ThrowDirection)
+{
+	if (!Mesh) return;
+
+	if (!Mesh->IsSimulatingPhysics())
+	{
+		Mesh->SetSimulatePhysics(true);
+	}
+
+	// Normalize to avoid scaling issues
+	const FVector Dir = ThrowDirection.GetSafeNormal();
+
+	// ---- Linear impulse (trajectory) ----
+	const FVector LinearImpulse =
+		Dir * ThrowStrength +
+		FVector::UpVector * ArcBoost;
+
+	Mesh->AddImpulse(LinearImpulse, NAME_None, true);
+
+	// ---- Angular impulse (spin) ----
+	const FVector AngularImpulse =
+		FVector(
+			FMath::RandRange(-1.f, 1.f),
+			FMath::RandRange(-1.f, 1.f),
+			FMath::RandRange(-1.f, 1.f)
+		) * SpinStrength;
+
+	Mesh->AddAngularImpulseInRadians(AngularImpulse, NAME_None, true);
+}
+
 
 void AFlashbangActor::DoFlashHitbox()
 {
