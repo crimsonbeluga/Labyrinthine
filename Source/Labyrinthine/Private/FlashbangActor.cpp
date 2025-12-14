@@ -52,7 +52,7 @@ void AFlashbangActor::Arm(float FuseSeconds, AActor* NewInstigator)
 
 void AFlashbangActor::Detonate()
 {
-	
+	CreateNoiseEvent();
 
 	// FX + SFX
 	if (ExplosionFX)
